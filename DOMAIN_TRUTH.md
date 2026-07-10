@@ -11,11 +11,13 @@ Ground truth lives in `src/nostart/domain/` and `World._active_faults`. Tool out
 
 ## Nominal (healthy) baselines
 
-| Engine state | battery_positive | starter_stud | engine_block / chassis | alt_output | crank | CAN |
-|--------------|-------------------|------------|----------------|------------|-------|-----|
-| key_off | 12.6 V | 12.6 V | 0.0 V | 12.6 V | — | ok |
-| key_on | 12.4 V | 12.3 V | 0.0 V | 12.4 V | — | ok |
-| cranking | 9.8 V | 9.6 V | 0.0 V | 9.5 V | starts | ok |
+
+| Engine state | battery_positive | starter_stud | engine_block / chassis | alt_output | crank  | CAN |
+| ------------ | ---------------- | ------------ | ---------------------- | ---------- | ------ | --- |
+| key_off      | 12.6 V           | 12.6 V       | 0.0 V                  | 12.6 V     | —      | ok  |
+| key_on       | 12.4 V           | 12.3 V       | 0.0 V                  | 12.4 V     | —      | ok  |
+| cranking     | 9.8 V            | 9.6 V        | 0.0 V                  | 9.5 V      | starts | ok  |
+
 
 All potentials are relative to `battery_negative` (reference, 0 V); readings are two-point differences between any node pair.
 
@@ -29,65 +31,101 @@ Because of this, a **resting red herring suppresses the whole resting supply pat
 
 ---
 
+
+
 ## Component failure modes → symptoms
+
+
 
 ### battery
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **weak** | `cca_remaining_pct` = 45% | −0.6 V terminals & stud; extra sag when cranking | P0562, B1318 | slow_crank (cranking only) | — | 1.0 | "Terminal corrosion light; case looks aged." |
-| **dead** | `open_circuit_v` = 2.1 V | Override terminals ≈2.1 V, stud ≈2.0 V, alt ≈2.1 V | P0562, B1318 | no_click | — | 1.0 | "Terminals corroded; slight sulfation odor." |
+
+| Mode     | Severity param            | Voltage effects                                    | DTCs         | Crank behavior             | CAN | Intermittency | Visual inspect                               |
+| -------- | ------------------------- | -------------------------------------------------- | ------------ | -------------------------- | --- | ------------- | -------------------------------------------- |
+| **weak** | `cca_remaining_pct` = 45% | −0.6 V terminals & stud; extra sag when cranking   | P0562, B1318 | slow_crank (cranking only) | —   | 1.0           | "Terminal corrosion light; case looks aged." |
+| **dead** | `open_circuit_v` = 2.1 V  | Override terminals ≈2.1 V, stud ≈2.0 V, alt ≈2.1 V | P0562, B1318 | no_click                   | —   | 1.0           | "Terminals corroded; slight sulfation odor." |
+
+
+
 
 ### ground_strap
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **corroded** | `added_resistance_ohms` (scenarios: 1.1 / 1.2 Ω) | key_on: engine_block rises +0.03 V; cranking: engine_block rises +min(R×2.5, 4.0) V (ground-path drop) AND battery/rail recovers +0.6×drop (reduced current — battery reads innocent, ≥ ~11.3 V) | P0562 | slow_crank (cranking) | — | 1.0 | 60% chance "looks normal"; else "greenish end" |
-| **broken** | `added_resistance_ohms` = 50 Ω | key_on/cranking: open ground — no starter current; engine_block floats to battery_positive − 0.2 V (drop test reads ~full battery voltage) | P0562 | click_no_crank | — | 1.0 | "Strap frayed at engine block." |
+
+| Mode         | Severity param                                   | Voltage effects                                                                                                                                                                                  | DTCs  | Crank behavior        | CAN | Intermittency | Visual inspect                                 |
+| ------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- | --------------------- | --- | ------------- | ---------------------------------------------- |
+| **corroded** | `added_resistance_ohms` (scenarios: 1.1 / 1.2 Ω) | key_on: engine_block rises +0.03 V; cranking: engine_block rises +min(R×2.5, 4.0) V (ground-path drop) AND battery/rail recovers +0.6×drop (reduced current — battery reads innocent, ≥ ~11.3 V) | P0562 | slow_crank (cranking) | —   | 1.0           | 60% chance "looks normal"; else "greenish end" |
+| **broken**   | `added_resistance_ohms` = 50 Ω                   | key_on/cranking: open ground — no starter current; engine_block floats to battery_positive − 0.2 V (drop test reads ~full battery voltage)                                                       | P0562 | click_no_crank        | —   | 1.0           | "Strap frayed at engine block."                |
+
+
+
 
 ### starter_relay
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **stuck_open** | — | — | P0615, P0616 | no_click | — | 1.0 | "No click heard at relay." |
-| **stuck_closed** | — | — | P0615, P0617 | slow_crank (key_on) | — | 1.0 | "Click persists after key release." |
+
+| Mode             | Severity param | Voltage effects | DTCs         | Crank behavior      | CAN | Intermittency | Visual inspect                      |
+| ---------------- | -------------- | --------------- | ------------ | ------------------- | --- | ------------- | ----------------------------------- |
+| **stuck_open**   | —              | —               | P0615, P0616 | no_click            | —   | 1.0           | "No click heard at relay."          |
+| **stuck_closed** | —              | —               | P0615, P0617 | slow_crank (key_on) | —   | 1.0           | "Click persists after key release." |
+
+
+
 
 ### starter_motor
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **worn_brushes** | `crank_rpm_factor` = 0.55 | cranking: −0.4 V terminals | P0615 | slow_crank (cranking) | — | 1.0 | "Grinding noise during slow crank." |
-| **seized** | — | cranking: −1.2 V terminals | P0615 | click_no_crank (cranking) | — | 1.0 | "Loud clunk, no rotation." |
+
+| Mode             | Severity param            | Voltage effects            | DTCs  | Crank behavior            | CAN | Intermittency | Visual inspect                      |
+| ---------------- | ------------------------- | -------------------------- | ----- | ------------------------- | --- | ------------- | ----------------------------------- |
+| **worn_brushes** | `crank_rpm_factor` = 0.55 | cranking: −0.4 V terminals | P0615 | slow_crank (cranking)     | —   | 1.0           | "Grinding noise during slow crank." |
+| **seized**       | —                         | cranking: −1.2 V terminals | P0615 | click_no_crank (cranking) | —   | 1.0           | "Loud clunk, no rotation."          |
+
+
+
 
 ### alternator
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **diode_failure** | `ac_ripple_v` = 1.2 V | −0.8 V alt_output; PID avg depressed by ripple×0.1 | P0622 | — (no-start context) | — | 1.0 | "Faint whine from alternator area." |
-| **no_output** | `output_v` = 0.0 V | Override alt_output = 0 V | P0622 | — | — | 1.0 | "Belt intact; connector seated." |
+
+| Mode              | Severity param        | Voltage effects                                    | DTCs  | Crank behavior       | CAN | Intermittency | Visual inspect                      |
+| ----------------- | --------------------- | -------------------------------------------------- | ----- | -------------------- | --- | ------------- | ----------------------------------- |
+| **diode_failure** | `ac_ripple_v` = 1.2 V | −0.8 V alt_output; PID avg depressed by ripple×0.1 | P0622 | — (no-start context) | —   | 1.0           | "Faint whine from alternator area." |
+| **no_output**     | `output_v` = 0.0 V    | Override alt_output = 0 V                          | P0622 | —                    | —   | 1.0           | "Belt intact; connector seated."    |
+
+
+
 
 ### fusible_link
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **blown** | — | key_on/cranking: −12 V at starter_stud | P0562 | no_click | — | 1.0 | "Link appears melted at mid-span." |
-| **high_resistance** | `added_resistance_ohms` = 2.5 Ω | cranking: −(min(R×1.8, 5.0)) V at stud | — | slow_crank (cranking) | — | 1.0 | "Link discolored but not open." |
+
+| Mode                | Severity param                  | Voltage effects                        | DTCs  | Crank behavior        | CAN | Intermittency | Visual inspect                     |
+| ------------------- | ------------------------------- | -------------------------------------- | ----- | --------------------- | --- | ------------- | ---------------------------------- |
+| **blown**           | —                               | key_on/cranking: −12 V at starter_stud | P0562 | no_click              | —   | 1.0           | "Link appears melted at mid-span." |
+| **high_resistance** | `added_resistance_ohms` = 2.5 Ω | cranking: −(min(R×1.8, 5.0)) V at stud | —     | slow_crank (cranking) | —   | 1.0           | "Link discolored but not open."    |
+
+
+
 
 ### ignition_switch
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **no_crank_signal** | — | key_on: −0.5 V starter_stud | — | no_click | — | 1.0 | "Dash lights flicker in START." |
-| **accessory_drop** | `voltage_drop_v` = 2.5 V | key_on: −0.75 V terminals, −2.5 V stud | P0562 | — | — | 1.0 | "Lights dim sharply in START." |
+
+| Mode                | Severity param           | Voltage effects                        | DTCs  | Crank behavior | CAN | Intermittency | Visual inspect                  |
+| ------------------- | ------------------------ | -------------------------------------- | ----- | -------------- | --- | ------------- | ------------------------------- |
+| **no_crank_signal** | —                        | key_on: −0.5 V starter_stud            | —     | no_click       | —   | 1.0           | "Dash lights flicker in START." |
+| **accessory_drop**  | `voltage_drop_v` = 2.5 V | key_on: −0.75 V terminals, −2.5 V stud | P0562 | —              | —   | 1.0           | "Lights dim sharply in START."  |
+
+
+
 
 ### ecu_can_node
 
-| Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
-|------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **bus_off** | — | — | U0100, U0101 | crank_no_start (cranking) | bus_off | 1.0 | "MIL on; scan tool intermittent." |
-| **intermittent** | `manifest_probability` = 0.35 | — | U0100 | — | degraded | 0.35 per probe | "No obvious wiring damage at ECM." |
+
+| Mode             | Severity param                | Voltage effects | DTCs         | Crank behavior            | CAN      | Intermittency  | Visual inspect                     |
+| ---------------- | ----------------------------- | --------------- | ------------ | ------------------------- | -------- | -------------- | ---------------------------------- |
+| **bus_off**      | —                             | —               | U0100, U0101 | crank_no_start (cranking) | bus_off  | 1.0            | "MIL on; scan tool intermittent."  |
+| **intermittent** | `manifest_probability` = 0.35 | —               | U0100        | —                         | degraded | 0.35 per probe | "No obvious wiring damage at ECM." |
+
 
 ---
+
+
 
 ## Crank behavior precedence
 
@@ -97,34 +135,44 @@ When multiple faults compete, the **worst** behavior wins:
 
 ---
 
+
+
 ## DTC code reference
 
-| Code | Description |
-|------|-------------|
-| P0562 | System voltage low |
-| P0563 | System voltage high |
-| P0615 | Starter relay circuit |
-| P0616 | Starter relay circuit low |
-| P0617 | Starter relay circuit high |
-| P0622 | Generator field control |
+
+| Code  | Description                     |
+| ----- | ------------------------------- |
+| P0562 | System voltage low              |
+| P0563 | System voltage high             |
+| P0615 | Starter relay circuit           |
+| P0616 | Starter relay circuit low       |
+| P0617 | Starter relay circuit high      |
+| P0622 | Generator field control         |
 | U0100 | Lost communication with ECM/PCM |
-| U0101 | Lost communication with TCM |
-| U0121 | Lost communication with ABS |
-| B1318 | Battery voltage low |
+| U0101 | Lost communication with TCM     |
+| U0121 | Lost communication with ABS     |
+| B1318 | Battery voltage low             |
+
 
 ---
+
+
 
 ## Phase 1 scenarios
 
-| ID | Tier | Seed | Root cause | Red herring | Complaint | Expert baseline |
-|----|------|------|------------|-------------|-----------|-----------------|
-| `easy_dead_battery` | easy | 1001 | battery:dead | — | "Nothing when I turn the key." | 15 min, $0 |
-| `medium_corroded_ground` | medium | 2001 | ground_strap:corroded (1.1 Ω) | — | "Slow crank, borderline battery at parts store." | 35 min, $25 |
-| `medium_ground_red_herring_battery` | medium | 2002 | ground_strap:corroded (1.2 Ω) | battery_positive forced to 11.8 V at rest | "Slow crank; shop said battery 'a little weak'." | 40 min, $25 |
 
-**Red herring semantics:** `red_herring_voltages` overrides resting readings (`key_off` / `key_on`) only — e.g. `battery_positive` ≈ 11.8 V tempts a weak-battery diagnosis, and the suppression flows down the whole resting supply path uniformly (stud/alt read equally low — no false stud anomaly at rest). Under cranking the override does not apply. **Innocent red-herring batteries hold ≥ ~11.3 V under crank** — this emerges from the physics, not a separate knob: the corroded ground chokes cranking current, so the battery sags only ~0.2 V below its resting bait (bait, not a co-fault). The diagnostic tell is the **ground-path drop under cranking** (`battery_negative` → `engine_block` ≈ 3.0 V) while the positive feed (`battery_positive` → `starter_stud`) stays ≤ ~0.5 V — a two-point drop test uniquely localizes the fault to the ground junction; no single-point reading does. **Replacing the red-herring component clears the bait:** the marginal resting readings belong to the original battery (`red_herring_component`), so after a known-good battery is installed, resting readings return to nominal (~12.6 V) while the ground-path tell and slow crank persist — a fresh battery can never read marginal at rest.
+| ID                                  | Tier   | Seed | Root cause                    | Red herring                               | Complaint                                        | Expert baseline |
+| ----------------------------------- | ------ | ---- | ----------------------------- | ----------------------------------------- | ------------------------------------------------ | --------------- |
+| `easy_dead_battery`                 | easy   | 1001 | battery:dead                  | —                                         | "Nothing when I turn the key."                   | 15 min, $0      |
+| `medium_corroded_ground`            | medium | 2001 | ground_strap:corroded (1.1 Ω) | —                                         | "Slow crank, borderline battery at parts store." | 35 min, $25     |
+| `medium_ground_red_herring_battery` | medium | 2002 | ground_strap:corroded (1.2 Ω) | battery_positive forced to 11.8 V at rest | "Slow crank; shop said battery 'a little weak'." | 40 min, $25     |
+
+
+**Red herring semantics:** `red_herring_voltages` overrides resting readings (`key_off` / `key_on`) only — e.g. `battery_positive` ≈ 11.8 V tempts a weak-battery diagnosis, and the suppression flows down the whole resting supply path uniformly (stud/alt read equally low — no false stud anomaly at rest). Under cranking the override does not apply. **Innocent red-herring batteries hold ≥ ~11.3 V under crank** — this emerges from the physics, not a separate knob: the corroded ground chokes cranking current, so the battery sags only ~~0.2 V below its resting bait (bait, not a co-fault). The diagnostic tell is the **ground-path drop under cranking** (~~`battery_negative` ~~→~~ `engine_block` ~~≈ 3.0 V) while the positive feed (~~`battery_positive` ~~→~~ `starter_stud`~~) stays ≤ ~0.5 V — a two-point drop test uniquely localizes the fault to the ground junction; no single-point reading does. **Replacing the red-herring component clears the bait:** the marginal resting readings belong to the original battery (~~`red_herring_component`~~), so after a known-good battery is installed, resting readings return to nominal (~~12.6 V) while the ground-path tell and slow crank persist — a fresh battery can never read marginal at rest.
 
 ---
+
+
 
 ## replace_part behavior
 
@@ -132,13 +180,15 @@ Installing a known-good part removes that component's fault from `_active_faults
 
 ---
 
+
+
 ## Sign-off checklist
 
-- [ ] Nominal voltages realistic for 12 V system
-- [ ] Ground drop model (R → V) plausible
-- [ ] Crank behavior mapping per fault correct
-- [ ] DTC assignments appropriate
-- [ ] Red herring scenario misleads but is beatable with voltage drop test
-- [ ] Part prices and action times reasonable
+- [x] Nominal voltages realistic for 12 V system
+- [x] Ground drop model (R → V) plausible
+- [x] Crank behavior mapping per fault correct
+- [x] DTC assignments appropriate
+- [x] Red herring scenario misleads but is beatable with voltage drop test
+- [x] Part prices and action times reasonable
 
-**Expert sign-off:** _________________ Date: _________
+**Expert sign-off:** Jaivir Parmar **Date:** July 10 , 2026
