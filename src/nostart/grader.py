@@ -26,7 +26,9 @@ WRONG_PART_PENALTY = 8.0
 COMPONENT_ONLY_CREDIT = ROOT_CAUSE_MAX / 2.0
 
 # Map dollars to minute-equivalents for cost-efficiency scaling.
-DOLLARS_PER_MINUTE_EQUIV = 10.0
+# $2 ≈ 1 minute (~$120/hr shop rate), so parts money genuinely hurts:
+# a $180 battery costs the same as 90 minutes of diagnostic time.
+DOLLARS_PER_MINUTE_EQUIV = 2.0  # TODO(VERIFY)
 
 
 class GradeBreakdown(BaseModel):
@@ -194,6 +196,17 @@ def grade(world: World) -> GradeBreakdown:
     total = root_pts + parts_pts + cost_pts
     guessing = world.probe_count == 0
     details: list[str] = []
+
+    # Wrong parts debit the TOTAL, not just the clamped discipline bucket:
+    # beyond ~3 wrong parts the bucket floors at 0, and without this a
+    # measure-once-then-shotgun agent still outscores careful-but-wrong ones.
+    wrong_penalty = len(wrong_parts) * WRONG_PART_PENALTY
+    if wrong_penalty:
+        total = max(0.0, total - wrong_penalty)
+        details.append(
+            f"{len(wrong_parts)} wrong part(s) replaced; "
+            f"-{wrong_penalty:.0f} applied to total."
+        )
 
     if guessing:
         total = min(total, GUESSING_CAP)

@@ -87,6 +87,22 @@ def parts_cannon_agent(scenario_id: str) -> GradeBreakdown:
     )
 
 
+def measured_parts_cannon_agent(scenario_id: str) -> GradeBreakdown:
+    """One token measurement to dodge the guessing cap, then shotgun parts."""
+    return _run_agent(
+        scenario_id,
+        [
+            ("measure_voltage", "battery_positive", "battery_negative", "key_on"),
+            ("replace_part", "battery"),
+            ("replace_part", "alternator"),
+            ("replace_part", "starter_motor"),
+            ("replace_part", "starter_relay"),
+            ("replace_part", "ground_strap"),
+            ("finish", "ground_strap corroded"),
+        ],
+    )
+
+
 def lucky_guess_agent(scenario_id: str, guess: str) -> GradeBreakdown:
     """Finish immediately with no measurements."""
     return _run_agent(scenario_id, [("finish", guess)])
@@ -141,6 +157,15 @@ class TestAdversarialAgents:
         assert result.parts_discipline <= 9.0
         assert result.total < self.BAD_SCORE_THRESHOLD
 
+    def test_measured_parts_cannon_scores_badly_without_guess_cap(self) -> None:
+        # One probe evades the guessing cap; the wrong-part debit to the
+        # total must still sink the strategy below the bad-score line.
+        result = measured_parts_cannon_agent("medium_corroded_ground")
+        assert not result.guessing_penalty_applied
+        assert result.root_cause == 60.0
+        assert len(result.wrong_parts_replaced) == 4
+        assert result.total < self.BAD_SCORE_THRESHOLD
+
     def test_lucky_guess_capped_even_if_correct(self) -> None:
         result = lucky_guess_agent("easy_dead_battery", "battery dead")
         assert result.guessing_penalty_applied
@@ -165,6 +190,11 @@ class TestAdversarialAgents:
     "agent_fn,scenario,label",
     [
         (lambda: parts_cannon_agent("medium_corroded_ground"), "medium_corroded_ground", "parts-cannon"),
+        (
+            lambda: measured_parts_cannon_agent("medium_corroded_ground"),
+            "medium_corroded_ground",
+            "measured-parts-cannon",
+        ),
         (lambda: lucky_guess_agent("easy_dead_battery", "battery dead"), "easy_dead_battery", "lucky-guess"),
         (
             lambda: mask_the_symptom_agent("medium_ground_red_herring_battery"),
