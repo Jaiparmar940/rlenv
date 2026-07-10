@@ -28,6 +28,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
+from dotenv import load_dotenv  # noqa: E402
+
+# Provider API keys from repo-root .env (see .env.example). Real environment
+# variables win over the file.
+load_dotenv(REPO / ".env")
+
 from inspect_ai import eval as inspect_eval  # noqa: E402
 from inspect_ai.log import EvalLog  # noqa: E402
 from inspect_ai.model import ModelOutput, get_model  # noqa: E402
