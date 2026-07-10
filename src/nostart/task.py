@@ -18,7 +18,6 @@ from typing import Any
 
 from inspect_ai import Task, task
 from inspect_ai.dataset import MemoryDataset, Sample
-from inspect_ai.model import GenerateConfig
 from inspect_ai.scorer import Score, Target, mean, scorer, stderr
 from inspect_ai.solver import Generate, TaskState, basic_agent, solver, system_message
 from inspect_ai.tool import Tool, ToolError, tool
@@ -263,10 +262,13 @@ def no_start(scenarios: str = "all", message_limit: int = 50) -> Task:
             message_limit=message_limit,
             submit_name="finish",
             submit_description=(
-                "Submit your final diagnosis: the faulty component and its "
-                "failure mode (e.g. 'fusible_link blown')."
+                "Submit your final diagnosis. BEGIN your answer with the "
+                "faulty component and its failure mode (e.g. 'fusible_link "
+                "blown'); supporting reasoning may follow."
             ),
         ),
         scorer=nostart_grader(),
-        config=GenerateConfig(temperature=0.0),
+        # No GenerateConfig: reasoning models (e.g. gpt-5.x) reject
+        # temperature; provider defaults apply. Determinism lives in the
+        # environment (seeded scenarios), not the model.
     )

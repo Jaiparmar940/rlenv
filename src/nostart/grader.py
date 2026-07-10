@@ -11,6 +11,7 @@ import re
 from pydantic import BaseModel, Field
 
 from nostart.domain.components import (
+    COMPONENT_FAILURE_MODES,
     Component,
     FailureMode,
     normalize_component,
@@ -73,18 +74,38 @@ def _normalize_mode_token(token: str) -> str:
     return token.strip().lower().replace("-", "_").replace(" ", "_")
 
 
-def parse_failure_mode(text: str) -> FailureMode | None:
-    """Extract a failure mode from free-text diagnosis."""
+def parse_failure_mode(
+    text: str, component: Component | None = None
+) -> FailureMode | None:
+    """Extract a failure mode from free-text diagnosis.
+
+    When the diagnosed component is known, only modes that component can
+    actually have are considered — otherwise prose explaining a red herring
+    ("a genuinely weak battery would sag lower") hijacks the mode slot.
+    Among valid candidates, the EARLIEST mention wins (models lead with
+    their diagnosis).
+    """
     normalized = _normalize_mode_token(text)
-    if normalized in _MODE_ALIASES:
+    valid: set[FailureMode] | None = None
+    if component is not None:
+        valid = set(COMPONENT_FAILURE_MODES.get(component, []))
+
+    def allowed(mode: FailureMode) -> bool:
+        return valid is None or mode in valid
+
+    if normalized in _MODE_ALIASES and allowed(_MODE_ALIASES[normalized]):
         return _MODE_ALIASES[normalized]
-    for mode in FailureMode:
-        if mode.value in normalized or mode.value.replace("_", " ") in normalized:
-            return mode
-    for alias, mode in _MODE_ALIASES.items():
-        if alias in normalized:
-            return mode
-    return None
+
+    earliest: tuple[int, FailureMode] | None = None
+    candidates = [(mode.value, mode) for mode in FailureMode]
+    candidates += list(_MODE_ALIASES.items())
+    for needle, mode in candidates:
+        if not allowed(mode):
+            continue
+        idx = normalized.find(needle)
+        if idx >= 0 and (earliest is None or idx < earliest[0]):
+            earliest = (idx, mode)
+    return earliest[1] if earliest else None
 
 
 def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | None]:
@@ -97,12 +118,16 @@ def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | N
 
     component: Component | None = normalize_component(raw)
     if component is None:
-        # Longest token match first to prefer ground_strap over strap-like noise.
-        for comp in sorted(Component, key=lambda c: len(c.value), reverse=True):
-            if comp.value in lowered or comp.value.replace("_", " ") in lowered:
-                component = comp
-                break
-        if component is None:
+        # EARLIEST full-name mention wins: models lead with their diagnosis,
+        # and later prose often mentions other components only to exonerate
+        # them ("...starves the starter motor; battery is not the cause").
+        earliest: tuple[int, Component] | None = None
+        for comp in Component:
+            for needle in (comp.value, comp.value.replace("_", " ")):
+                idx = lowered.find(needle)
+                if idx >= 0 and (earliest is None or idx < earliest[0]):
+                    earliest = (idx, comp)
+        if earliest is None:
             aliases = {
                 "bat": Component.BATTERY,
                 "ground": Component.GROUND_STRAP,
@@ -116,11 +141,13 @@ def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | N
                 "can": Component.ECU_CAN_NODE,
             }
             for alias, comp in aliases.items():
-                if re.search(rf"\b{re.escape(alias)}\b", lowered):
-                    component = comp
-                    break
+                match = re.search(rf"\b{re.escape(alias)}\b", lowered)
+                if match and (earliest is None or match.start() < earliest[0]):
+                    earliest = (match.start(), comp)
+        if earliest is not None:
+            component = earliest[1]
 
-    mode = parse_failure_mode(lowered)
+    mode = parse_failure_mode(lowered, component)
     return component, mode
 
 

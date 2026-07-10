@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from nostart.domain.components import Component
+from nostart.domain.components import Component, FailureMode
 from nostart.grader import (
     GUESSING_CAP,
     GradeBreakdown,
@@ -50,6 +50,42 @@ class TestDiagnosisParsing:
         assert comp == Component.BATTERY
         assert mode is not None
         assert mode.value == "dead"
+
+    def test_prose_diagnosis_first_mention_wins(self) -> None:
+        # Real claude-sonnet-5 answer that the length-sorted parser misread
+        # as starter_motor (mentioned later, only to describe the symptom).
+        text = (
+            "Root cause: engine-to-chassis ground strap has a corroded/"
+            "high-resistance connection. Cranking voltage-drop test showed "
+            "~2.8V drop across engine_block-to-chassis. This excessive "
+            "ground resistance starves the starter motor of usable voltage, "
+            "causing slow cranking. Battery and starter motor tested "
+            "normally and are not the cause."
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.GROUND_STRAP
+        assert mode == FailureMode.CORRODED
+
+    def test_weak_battery_exoneration_does_not_hijack_mode(self) -> None:
+        # Real claude-sonnet-5 red-herring answer: 'weak' appears only in
+        # the sentence PROVING the battery innocent; mode must stay corroded.
+        text = (
+            "Root cause: engine-to-chassis ground strap has excessive "
+            "resistance (corroded/loose ground strap), not the battery. "
+            "A genuinely weak battery would sag much lower under starter "
+            "load, so the battery itself is essentially healthy."
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.GROUND_STRAP
+        assert mode == FailureMode.CORRODED
+
+    def test_prose_diagnosis_exoneration_does_not_hijack(self) -> None:
+        text = (
+            "Battery failure — internally shorted/sulfated cell, reading "
+            "2.1V at rest. The starter relay and ignition switch are fine."
+        )
+        comp, _ = parse_diagnosis(text)
+        assert comp == Component.BATTERY
 
 
 class TestExpertAgent:

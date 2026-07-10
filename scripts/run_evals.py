@@ -126,6 +126,10 @@ def collect_rows(logs: list[EvalLog]) -> list[dict]:
     for log in logs:
         model_name = str(log.eval.model)
         for sample in log.samples or []:
+            if getattr(sample, "error", None):
+                print(f"NOTE: skipping errored sample {model_name}/"
+                      f"{sample.id} e{sample.epoch}: {sample.error}")
+                continue
             score = sample.scores.get(SCORER_NAME) if sample.scores else None
             meta = score.metadata if score and score.metadata else {}
             rows.append({
