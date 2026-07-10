@@ -29,8 +29,9 @@ SCENARIOS = (
 NOISE_TOL = 0.1     # single noisy reading vs expected physics
 PAIR_TOL = 0.12     # comparing two independent noisy readings (2 noise draws)
 MONO_EPS = 0.1      # resting monotonicity slack
-LARGE_DROP = 1.5    # a "large" ground-path drop under load
-FEED_SMALL = 0.75   # positive-feed drop must stay small for localization
+LARGE_DROP = 2.5    # a "large" ground-path drop under load
+FEED_SMALL = 0.5    # positive-feed drop must stay small for localization
+BATTERY_HOLDS = 11.3  # innocent battery floor under crank in ground-fault scenarios
 
 
 class Failure:
@@ -164,10 +165,10 @@ def check_corroded_ground(scenario: str) -> tuple[str, list[Failure]]:
                     "≈ 12.6", f"{batt_off:.2f}")
         )
     batt_crank = measure(scenario, "battery_positive", "battery_negative", "cranking")
-    if batt_crank < 9.8 - NOISE_TOL:
+    if batt_crank < BATTERY_HOLDS - NOISE_TOL:
         fails.append(
-            Failure(scenario, "cranking", "battery holds ≥ ~9.8 V under load",
-                    "≥ 9.8", f"{batt_crank:.2f}")
+            Failure(scenario, "cranking", "battery holds under load (innocent)",
+                    f"≥ {BATTERY_HOLDS}", f"{batt_crank:.2f}")
         )
 
     for state in ("key_off", "key_on"):
@@ -206,10 +207,10 @@ def check_red_herring(scenario: str) -> tuple[str, list[Failure]]:
             )
 
     batt_crank = measure(scenario, "battery_positive", "battery_negative", "cranking")
-    if batt_crank < 10.3 - NOISE_TOL:
+    if batt_crank < BATTERY_HOLDS - NOISE_TOL:
         fails.append(
-            Failure(scenario, "cranking", "battery HOLDS ≥ ~10.3 V under load (innocent)",
-                    "≥ 10.3", f"{batt_crank:.2f}")
+            Failure(scenario, "cranking", "battery HOLDS under load (innocent)",
+                    f"≥ {BATTERY_HOLDS}", f"{batt_crank:.2f}")
         )
     gnd_crank = _abs_ground_drop(scenario, "cranking")
     if gnd_crank < LARGE_DROP:

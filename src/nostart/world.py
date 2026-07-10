@@ -143,10 +143,18 @@ class World:
         self._action_count += 1
 
     def _resolve(self, engine_state: EngineState) -> SymptomState:
+        herring = self._scenario.red_herring_voltages or None
+        if (
+            herring is not None
+            and self._scenario.red_herring_component in self._replaced_components
+        ):
+            # The marginal resting readings belong to the original component;
+            # a known-good replacement reads nominal at rest.
+            herring = None
         return resolve_symptoms(
             self._active_faults,
             engine_state,
-            red_herring_readings=self._scenario.red_herring_voltages or None,
+            red_herring_readings=herring,
         )
 
     def _intermittent_manifests(self, intermittency: float, probe_tag: str) -> bool:

@@ -109,8 +109,12 @@ GROUND_DROP_PER_OHM = 2.5          # V of ground-path drop per added ohm, under 
 GROUND_DROP_CAP = 4.0              # max modeled ground-path drop (V)
 GROUND_REST_RISE = 0.03            # tiny engine_block rise at key_on for corroded ground
 # A series ground resistance limits current, so the battery sags LESS than a
-# healthy full-current crank. This fraction of the ground drop is "recovered".
-GROUND_CURRENT_RECOVERY = 0.35
+# healthy full-current crank. This fraction of the ground drop is "recovered"
+# at the battery terminals. Derivation: healthy crank ~180 A sags the battery
+# 12.6→9.8 V (internal R ≈ 15.6 mΩ). A ground fault choking current to ~half
+# recovers ΔI×R_int ≈ 90×0.0156 ≈ 1.4 V against a ~2.5 V ground drop → ~0.6.
+# Keeps the battery ≥ ~11.3 V under crank in ground-fault scenarios (innocent).
+GROUND_CURRENT_RECOVERY = 0.6  # TODO(VERIFY)
 POS_CABLE_DROP_PER_OHM = 1.8       # V of positive-cable drop per added ohm, under crank
 POS_CABLE_DROP_CAP = 5.0
 BROKEN_GROUND_ACROSS = 0.2         # residual V across starter with an open ground

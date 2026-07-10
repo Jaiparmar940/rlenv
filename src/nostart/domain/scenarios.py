@@ -32,6 +32,10 @@ class ScenarioDef(BaseModel):
     # name (e.g. "battery_positive"); applied at key_off/key_on only, never at
     # cranking. Does not inject a fault.
     red_herring_voltages: dict[str, float] = Field(default_factory=dict)
+    # Component the red-herring readings belong to: replacing it with a
+    # known-good part clears them (a fresh battery cannot read marginal at
+    # rest). Required whenever red_herring_voltages is set.
+    red_herring_component: Component | None = None
 
 
 # Phase 1: 3 scenarios (1 easy, 2 medium w/ one red herring).
@@ -58,7 +62,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         root_cause=InjectedFault(
             component=Component.GROUND_STRAP,
             mode=FailureMode.CORRODED,
-            severity={"added_resistance_ohms": 0.8},  # TODO(VERIFY)
+            severity={"added_resistance_ohms": 1.1},  # TODO(VERIFY)
         ),
         expert_baseline_cost={"minutes": 35.0, "dollars": 25.0},  # TODO(VERIFY): strap cost
     ),
@@ -73,7 +77,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         root_cause=InjectedFault(
             component=Component.GROUND_STRAP,
             mode=FailureMode.CORRODED,
-            severity={"added_resistance_ohms": 1.0},  # TODO(VERIFY): slightly worse ground
+            severity={"added_resistance_ohms": 1.2},  # TODO(VERIFY): slightly worse ground
         ),
         # Resting supply path uniformly suppressed as bait (NOT the root cause).
         # Under cranking the corroded ground physics naturally lets the battery
@@ -81,6 +85,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         red_herring_voltages={
             "battery_positive": 11.8,  # TODO(VERIFY): marginal but not dead; resting only
         },
+        red_herring_component=Component.BATTERY,
         expert_baseline_cost={"minutes": 40.0, "dollars": 25.0},  # TODO(VERIFY)
     ),
 }

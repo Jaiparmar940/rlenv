@@ -11,11 +11,13 @@ Ground truth lives in `src/nostart/domain/` and `World._active_faults`. Tool out
 
 ## Nominal (healthy) baselines
 
-| Engine state | battery_terminals | starter_stud | chassis_ground | alt_output | crank | CAN |
+| Engine state | battery_positive | starter_stud | engine_block / chassis | alt_output | crank | CAN |
 |--------------|-------------------|------------|----------------|------------|-------|-----|
 | key_off | 12.6 V | 12.6 V | 0.0 V | 12.6 V | — | ok |
 | key_on | 12.4 V | 12.3 V | 0.0 V | 12.4 V | — | ok |
 | cranking | 9.8 V | 9.6 V | 0.0 V | 9.5 V | starts | ok |
+
+All potentials are relative to `battery_negative` (reference, 0 V); readings are two-point differences between any node pair.
 
 Meter noise: ±0.05 V on voltage probes (seeded). All values `TODO(VERIFY)`.
 
@@ -40,8 +42,8 @@ Because of this, a **resting red herring suppresses the whole resting supply pat
 
 | Mode | Severity param | Voltage effects | DTCs | Crank behavior | CAN | Intermittency | Visual inspect |
 |------|----------------|-----------------|------|----------------|-----|---------------|----------------|
-| **corroded** | `added_resistance_ohms` = 0.8 Ω | key_on: −0.15 V at starter_stud; cranking: −(min(R×2.5, 4.0)) V at stud | P0562 | slow_crank (cranking) | — | 1.0 | 60% chance "looks normal"; else "greenish end" |
-| **broken** | `added_resistance_ohms` = 50 Ω | key_on/cranking: −8.0 V at starter_stud | P0562 | click_no_crank | — | 1.0 | "Strap frayed at engine block." |
+| **corroded** | `added_resistance_ohms` (scenarios: 1.1 / 1.2 Ω) | key_on: engine_block rises +0.03 V; cranking: engine_block rises +min(R×2.5, 4.0) V (ground-path drop) AND battery/rail recovers +0.6×drop (reduced current — battery reads innocent, ≥ ~11.3 V) | P0562 | slow_crank (cranking) | — | 1.0 | 60% chance "looks normal"; else "greenish end" |
+| **broken** | `added_resistance_ohms` = 50 Ω | key_on/cranking: open ground — no starter current; engine_block floats to battery_positive − 0.2 V (drop test reads ~full battery voltage) | P0562 | click_no_crank | — | 1.0 | "Strap frayed at engine block." |
 
 ### starter_relay
 
@@ -117,10 +119,10 @@ When multiple faults compete, the **worst** behavior wins:
 | ID | Tier | Seed | Root cause | Red herring | Complaint | Expert baseline |
 |----|------|------|------------|-------------|-----------|-----------------|
 | `easy_dead_battery` | easy | 1001 | battery:dead | — | "Nothing when I turn the key." | 15 min, $0 |
-| `medium_corroded_ground` | medium | 2001 | ground_strap:corroded (0.8 Ω) | — | "Slow crank, borderline battery at parts store." | 35 min, $25 |
-| `medium_ground_red_herring_battery` | medium | 2002 | ground_strap:corroded (1.0 Ω) | battery_terminals forced to 11.8 V key_on | "Slow crank; shop said battery 'a little weak'." | 40 min, $25 |
+| `medium_corroded_ground` | medium | 2001 | ground_strap:corroded (1.1 Ω) | — | "Slow crank, borderline battery at parts store." | 35 min, $25 |
+| `medium_ground_red_herring_battery` | medium | 2002 | ground_strap:corroded (1.2 Ω) | battery_positive forced to 11.8 V at rest | "Slow crank; shop said battery 'a little weak'." | 40 min, $25 |
 
-**Red herring semantics:** `red_herring_voltages` overrides resting readings (`key_off` / `key_on`) only — e.g. `battery_terminals` ≈ 11.8 V tempts a weak-battery diagnosis. Cranking voltages always sag below resting. **Innocent red-herring batteries** must hold **above the healthy cranking floor** (~9.8 V) under load via `red_herring_cranking_battery` (this scenario: **10.5 V**); they read marginal at rest but fine under crank. The diagnostic signal is the **battery-vs-starter_stud delta under cranking** (voltage-drop test), not either point alone — stud sags ~7 V while battery holds ~10.5 V (~3 V gap).
+**Red herring semantics:** `red_herring_voltages` overrides resting readings (`key_off` / `key_on`) only — e.g. `battery_positive` ≈ 11.8 V tempts a weak-battery diagnosis, and the suppression flows down the whole resting supply path uniformly (stud/alt read equally low — no false stud anomaly at rest). Under cranking the override does not apply. **Innocent red-herring batteries hold ≥ ~11.3 V under crank** — this emerges from the physics, not a separate knob: the corroded ground chokes cranking current, so the battery sags only ~0.2 V below its resting bait (bait, not a co-fault). The diagnostic tell is the **ground-path drop under cranking** (`battery_negative` → `engine_block` ≈ 3.0 V) while the positive feed (`battery_positive` → `starter_stud`) stays ≤ ~0.5 V — a two-point drop test uniquely localizes the fault to the ground junction; no single-point reading does. **Replacing the red-herring component clears the bait:** the marginal resting readings belong to the original battery (`red_herring_component`), so after a known-good battery is installed, resting readings return to nominal (~12.6 V) while the ground-path tell and slow crank persist — a fresh battery can never read marginal at rest.
 
 ---
 

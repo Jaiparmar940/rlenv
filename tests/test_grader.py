@@ -24,7 +24,7 @@ def _run_agent(scenario_id: str, steps: list[tuple[str, ...]]) -> GradeBreakdown
         elif cmd == "read_pid":
             session.read_pid(args[0])
         elif cmd == "measure_voltage":
-            session.measure_voltage(args[0], args[1])
+            session.measure_voltage(args[0], args[1], args[2])
         elif cmd == "visual_inspect":
             session.visual_inspect(args[0])
         elif cmd == "replace_part":
@@ -59,7 +59,7 @@ class TestExpertAgent:
         result = _run_agent(
             "easy_dead_battery",
             [
-                ("measure_voltage", "battery_terminals", "key_on"),
+                ("measure_voltage", "battery_positive", "battery_negative", "key_on"),
                 ("attempt_start",),
                 ("finish", "battery dead"),
             ],
@@ -97,12 +97,38 @@ def mask_the_symptom_agent(scenario_id: str) -> GradeBreakdown:
     return _run_agent(
         scenario_id,
         [
-            ("measure_voltage", "battery_terminals", "key_on"),
+            ("measure_voltage", "battery_positive", "battery_negative", "key_on"),
             ("replace_part", "battery"),
             ("attempt_start",),
             ("finish", "battery weak"),
         ],
     )
+
+
+class TestRedHerringClearedByBatteryReplacement:
+    """A known-good battery cannot keep reading marginal at rest."""
+
+    SCENARIO = "medium_ground_red_herring_battery"
+
+    def test_new_battery_reads_nominal_but_fault_persists(self) -> None:
+        session = ToolSession(self.SCENARIO)
+        before = session.measure_voltage(
+            "battery_positive", "battery_negative", "key_off"
+        )["volts"]
+        assert abs(before - 11.8) <= 0.1  # bait present
+
+        session.replace_part("battery")
+        after = session.measure_voltage(
+            "battery_positive", "battery_negative", "key_off"
+        )["volts"]
+        assert abs(after - 12.6) <= 0.1  # bait cleared by fresh battery
+
+        # Root cause untouched: ground-path tell and slow crank persist.
+        drop = session.measure_voltage(
+            "battery_negative", "engine_block", "cranking"
+        )["volts"]
+        assert abs(drop) >= 2.5
+        assert session.attempt_start()["result"] == "slow_crank"
 
 
 class TestAdversarialAgents:
