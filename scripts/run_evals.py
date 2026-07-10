@@ -1,0 +1,275 @@
+#!/usr/bin/env python
+"""Run the no-start eval across model APIs; emit results table + transcripts.
+
+Usage:
+    python scripts/run_evals.py --models anthropic/claude-sonnet-5,openai/gpt-5 \
+        --scenarios all
+    python scripts/run_evals.py --mock          # offline pipeline check
+
+Outputs (under --out, default results/):
+    results.md                markdown table, deterministically ordered
+    transcripts/*.md          full per-episode message transcripts
+    logs/*.eval               raw Inspect logs
+
+Real-model runs need provider API keys in the environment
+(ANTHROPIC_API_KEY, OPENAI_API_KEY, ...).
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+import sys
+from datetime import date
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "src"))
+
+from inspect_ai import eval as inspect_eval  # noqa: E402
+from inspect_ai.log import EvalLog  # noqa: E402
+from inspect_ai.model import ModelOutput, get_model  # noqa: E402
+
+from nostart.domain.scenarios import list_scenarios  # noqa: E402
+from nostart.task import no_start  # noqa: E402
+
+SCORER_NAME = "nostart_grader"
+
+# Scripted expert trajectories for --mock: proves the pipeline end to end
+# without API keys. One eval per scenario so each script matches its sample.
+MOCK_SCRIPTS: dict[str, list[tuple[str, dict]]] = {
+    "easy_dead_battery": [
+        ("measure_voltage", {"point_a": "battery_positive",
+                             "point_b": "battery_negative",
+                             "engine_state": "key_on"}),
+        ("finish", {"answer": "battery dead"}),
+    ],
+    "medium_corroded_ground": [
+        ("measure_voltage", {"point_a": "battery_negative",
+                             "point_b": "engine_block",
+                             "engine_state": "cranking"}),
+        ("finish", {"answer": "ground_strap corroded"}),
+    ],
+    "medium_ground_red_herring_battery": [
+        ("measure_voltage", {"point_a": "battery_positive",
+                             "point_b": "battery_negative",
+                             "engine_state": "cranking"}),
+        ("measure_voltage", {"point_a": "battery_negative",
+                             "point_b": "engine_block",
+                             "engine_state": "cranking"}),
+        ("finish", {"answer": "ground_strap corroded"}),
+    ],
+}
+
+
+def _sanitize(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+
+
+def _git_commit() -> str:
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=REPO,
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+    except Exception:
+        return "unknown"
+
+
+def _msg_text(message) -> str:
+    text = getattr(message, "text", "") or ""
+    return text.strip()
+
+
+def render_transcript(model_name: str, sample) -> str:
+    lines = [
+        f"# {model_name} — {sample.id} (epoch {sample.epoch})",
+        "",
+    ]
+    score = sample.scores.get(SCORER_NAME) if sample.scores else None
+    if score is not None:
+        lines += [
+            f"**Score: {score.value}**",
+            "```json",
+            json.dumps(score.metadata, indent=1),
+            "```",
+            "",
+            "---",
+            "",
+        ]
+    for message in sample.messages:
+        role = message.role.upper()
+        if role == "TOOL":
+            fn = getattr(message, "function", None) or "tool"
+            lines.append(f"### TOOL RESULT ({fn})")
+        else:
+            lines.append(f"### {role}")
+        text = _msg_text(message)
+        if text:
+            lines += ["", text, ""]
+        for call in getattr(message, "tool_calls", None) or []:
+            args = json.dumps(call.arguments, sort_keys=True)
+            lines += ["", f"→ `{call.function}({args})`", ""]
+    return "\n".join(lines) + "\n"
+
+
+def collect_rows(logs: list[EvalLog]) -> list[dict]:
+    rows = []
+    for log in logs:
+        model_name = str(log.eval.model)
+        for sample in log.samples or []:
+            score = sample.scores.get(SCORER_NAME) if sample.scores else None
+            meta = score.metadata if score and score.metadata else {}
+            rows.append({
+                "model": model_name,
+                "scenario": str(sample.id),
+                "epoch": sample.epoch,
+                "total": score.value if score else 0.0,
+                "root": meta.get("root_cause", 0.0),
+                "parts": meta.get("parts_discipline", 0.0),
+                "cost": meta.get("cost_efficiency", 0.0),
+                "guess_cap": meta.get("guessing_penalty_applied", False),
+                "wrong_parts": ", ".join(meta.get("wrong_parts_replaced", [])),
+                "diagnosis": (score.answer or "").replace("\n", " ")[:60]
+                if score else "",
+                "true": f"{meta.get('true_component', '?')} "
+                        f"{meta.get('true_mode', '?')}",
+                "sample": sample,
+            })
+    rows.sort(key=lambda r: (r["model"], r["scenario"], r["epoch"]))
+    return rows
+
+
+def write_results(rows: list[dict], out_dir: Path) -> Path:
+    lines = [
+        "# no-start-env results",
+        "",
+        f"Generated {date.today().isoformat()} at commit `{_git_commit()}`.",
+        "Score 0–100: root cause 60 / parts discipline 25 / cost efficiency 15;"
+        " wrong parts −8 each (also debited from total); finishing with no"
+        " measurements caps at 40.",
+        "",
+        "| model | scenario | epoch | total | root | parts | cost | guess cap"
+        " | wrong parts | diagnosis |",
+        "|---|---|---:|---:|---:|---:|---:|---|---|---|",
+    ]
+    for r in rows:
+        lines.append(
+            f"| {r['model']} | {r['scenario']} | {r['epoch']} | {r['total']:.1f}"
+            f" | {r['root']:.0f} | {r['parts']:.0f} | {r['cost']:.2f}"
+            f" | {'yes' if r['guess_cap'] else ''} | {r['wrong_parts']}"
+            f" | {r['diagnosis']} |"
+        )
+    lines += ["", "## Per-model means", "", "| model | mean total |", "|---|---:|"]
+    by_model: dict[str, list[float]] = {}
+    for r in rows:
+        by_model.setdefault(r["model"], []).append(float(r["total"]))
+    for model_name in sorted(by_model):
+        vals = by_model[model_name]
+        lines.append(f"| {model_name} | {sum(vals) / len(vals):.1f} |")
+    lines.append("")
+
+    out = out_dir / "results.md"
+    out.write_text("\n".join(lines))
+    return out
+
+
+def write_transcripts(rows: list[dict], out_dir: Path) -> Path:
+    tdir = out_dir / "transcripts"
+    tdir.mkdir(parents=True, exist_ok=True)
+    for r in rows:
+        fname = (
+            f"{_sanitize(r['model'])}__{_sanitize(r['scenario'])}"
+            f"__e{r['epoch']}.md"
+        )
+        (tdir / fname).write_text(render_transcript(r["model"], r["sample"]))
+    return tdir
+
+
+def run_real(models: list[str], scenarios: str, epochs: int,
+             message_limit: int, log_dir: Path) -> list[EvalLog]:
+    return inspect_eval(
+        no_start(scenarios=scenarios, message_limit=message_limit),
+        model=models,
+        epochs=epochs,
+        log_dir=str(log_dir),
+        display="rich",
+    )
+
+
+def run_mock(scenario_ids: list[str], message_limit: int,
+             log_dir: Path) -> list[EvalLog]:
+    logs: list[EvalLog] = []
+    for scenario_id in scenario_ids:
+        script = MOCK_SCRIPTS[scenario_id]
+        model = get_model(
+            "mockllm/model",
+            custom_outputs=[
+                ModelOutput.for_tool_call("mockllm/model", fn, args)
+                for fn, args in script
+            ],
+        )
+        logs += inspect_eval(
+            no_start(scenarios=scenario_id, message_limit=message_limit),
+            model=model,
+            log_dir=str(log_dir),
+            display="none",
+        )
+    return logs
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--models",
+        help="Comma-separated Inspect model ids, e.g. "
+             "anthropic/claude-sonnet-5,openai/gpt-5",
+    )
+    parser.add_argument("--scenarios", default="all",
+                        help='"all" or comma-separated scenario ids')
+    parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--message-limit", type=int, default=50)
+    parser.add_argument("--out", default=str(REPO / "results"))
+    parser.add_argument("--mock", action="store_true",
+                        help="Offline pipeline check with a scripted expert")
+    args = parser.parse_args()
+
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log_dir = out_dir / "logs"
+
+    scenario_ids = (
+        list_scenarios() if args.scenarios == "all"
+        else [s.strip() for s in args.scenarios.split(",") if s.strip()]
+    )
+
+    if args.mock:
+        logs = run_mock(scenario_ids, args.message_limit, log_dir)
+    else:
+        if not args.models:
+            parser.error(
+                "--models is required (or use --mock). Example: "
+                "--models anthropic/claude-sonnet-5,openai/gpt-5"
+            )
+        logs = run_real(
+            [m.strip() for m in args.models.split(",")],
+            args.scenarios, args.epochs, args.message_limit, log_dir,
+        )
+
+    failed = [log for log in logs if log.status != "success"]
+    rows = collect_rows(logs)
+    results_path = write_results(rows, out_dir)
+    tdir = write_transcripts(rows, out_dir)
+
+    print(f"\nResults table: {results_path}")
+    print(f"Transcripts:   {tdir}")
+    if failed:
+        print(f"WARNING: {len(failed)} eval run(s) did not succeed.")
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -27,3 +27,7 @@ htmlcov/
 venv/
 .env
 .DS_Store
+
+# Eval outputs (regenerate with scripts/run_evals.py; publish copies the
+# results table into the README explicitly)
+results/
