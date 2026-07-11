@@ -89,20 +89,102 @@ class TestDiagnosisParsing:
 
 
 class TestExpertAgent:
-    """Sanity: a competent diagnostic path should score well."""
+    """Sanity: a full-resolution expert path (diagnose, repair, verify) = 100."""
 
-    def test_easy_dead_battery_expert(self) -> None:
+    def test_easy_dead_battery_expert_full_resolution(self) -> None:
         result = _run_agent(
             "easy_dead_battery",
             [
-                ("measure_voltage", "battery_positive", "battery_negative", "key_on"),
+                ("attempt_start",),
+                ("measure_voltage", "battery_positive", "battery_negative", "key_off"),
+                ("replace_part", "battery"),
                 ("attempt_start",),
                 ("finish", "battery dead"),
             ],
         )
         assert result.root_cause == 60.0
-        assert result.total >= 70.0
-        assert not result.guessing_penalty_applied
+        assert result.fix_verified
+        assert not result.resolution_penalty_applied
+        assert result.total == 100.0
+
+    def test_corroded_ground_expert_full_resolution(self) -> None:
+        result = _run_agent(
+            "medium_corroded_ground",
+            [
+                ("attempt_start",),
+                ("measure_voltage", "battery_positive", "battery_negative", "key_off"),
+                ("measure_voltage", "battery_positive", "battery_negative", "cranking"),
+                ("measure_voltage", "battery_negative", "engine_block", "cranking"),
+                ("measure_voltage", "battery_positive", "starter_stud", "cranking"),
+                ("replace_part", "ground_strap"),
+                ("attempt_start",),
+                ("finish", "ground_strap corroded"),
+            ],
+        )
+        assert result.root_cause == 60.0
+        assert result.fix_verified
+        assert result.total == 100.0
+
+
+class TestResolutionPenalty:
+    """Full resolution is required: diagnose-only and unverified repairs lose points."""
+
+    def test_diagnose_only_penalized_even_when_correct(self) -> None:
+        result = _run_agent(
+            "easy_dead_battery",
+            [
+                ("attempt_start",),
+                ("measure_voltage", "battery_positive", "battery_negative", "key_off"),
+                ("finish", "battery dead"),
+            ],
+        )
+        assert result.root_cause == 60.0
+        assert not result.fix_verified
+        assert result.resolution_penalty_applied
+        assert result.total == 85.0  # 60 + 25 + 15 - 15
+
+    def test_correct_repair_without_verify_penalized(self) -> None:
+        result = _run_agent(
+            "easy_dead_battery",
+            [
+                ("attempt_start",),
+                ("measure_voltage", "battery_positive", "battery_negative", "key_off"),
+                ("replace_part", "battery"),
+                ("finish", "battery dead"),
+            ],
+        )
+        assert not result.fix_verified
+        assert result.resolution_penalty_applied
+        assert result.total == 85.0
+
+    def test_start_before_replacement_does_not_count_as_verify(self) -> None:
+        # Crank, replace, never re-crank: the pre-replacement attempt must not
+        # satisfy verification.
+        result = _run_agent(
+            "easy_dead_battery",
+            [
+                ("measure_voltage", "battery_positive", "battery_negative", "key_off"),
+                ("attempt_start",),
+                ("replace_part", "battery"),
+                ("finish", "battery dead"),
+            ],
+        )
+        assert not result.fix_verified
+        assert result.resolution_penalty_applied
+
+    def test_wrong_part_relief_does_not_verify(self) -> None:
+        # Red herring: swap the innocent battery, car still slow-cranks.
+        result = _run_agent(
+            "medium_ground_red_herring_battery",
+            [
+                ("measure_voltage", "battery_positive", "battery_negative", "key_off"),
+                ("replace_part", "battery"),
+                ("attempt_start",),
+                ("finish", "battery weak"),
+            ],
+        )
+        assert not result.fix_verified
+        assert result.resolution_penalty_applied
 
 
 # --- Adversarial agents (must score badly) ---

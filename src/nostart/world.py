@@ -101,6 +101,10 @@ class World:
         self._action_count = 0
         self._probe_count = 0  # measurements for guessing penalty (grader phase 2)
         self._crank_attempts = 0
+        # True once attempt_start returns "starts" with no replacement after it.
+        # Grader combines this with root-component-replaced to require a
+        # verified fix (resolution penalty otherwise).
+        self._fix_verified = False
 
     # --- Ground truth accessors (tool layer only, never serialized) ---
 
@@ -119,6 +123,11 @@ class World:
     @property
     def probe_count(self) -> int:
         return self._probe_count
+
+    @property
+    def fix_verified(self) -> bool:
+        """A start attempt succeeded after the most recent replacement."""
+        return self._fix_verified
 
     @property
     def scenario(self) -> ScenarioDef:
@@ -289,6 +298,7 @@ class World:
 
         self._charge_action("replace_part", component=comp.value)
         self._replaced_components.add(comp)
+        self._fix_verified = False  # any new install must be re-verified
         # Remove fault for this component (known-good part installed).
         self._active_faults = [f for f in self._active_faults if f.component != comp]
         return {"installed": True}
@@ -300,6 +310,8 @@ class World:
         symptoms = self._resolve(EngineState.CRANKING)
         if not self._intermittent_manifests(symptoms.intermittency, "attempt_start"):
             symptoms = resolve_symptoms([], EngineState.CRANKING)
+        if symptoms.crank_behavior == CrankBehavior.STARTS:
+            self._fix_verified = True
         return {"result": symptoms.crank_behavior.value}
 
     def finish(self, diagnosis: str) -> EpisodeStatus:

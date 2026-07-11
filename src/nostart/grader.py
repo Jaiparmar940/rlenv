@@ -24,6 +24,11 @@ PARTS_DISCIPLINE_MAX = 25.0
 COST_EFFICIENCY_MAX = 15.0
 GUESSING_CAP = 40.0
 WRONG_PART_PENALTY = 8.0
+# Episodes are full-resolution: the agent must replace the root-cause part AND
+# confirm with a successful attempt_start() after the last replacement.
+# Diagnose-only finishes and unverified repairs both take this flat debit,
+# even when the diagnosis (or the repair) happens to be correct.
+RESOLUTION_PENALTY = 15.0
 COMPONENT_ONLY_CREDIT = ROOT_CAUSE_MAX / 2.0
 
 # Map dollars to minute-equivalents for cost-efficiency scaling.
@@ -38,6 +43,8 @@ class GradeBreakdown(BaseModel):
     cost_efficiency: float = 0.0
     total: float = 0.0
     guessing_penalty_applied: bool = False
+    fix_verified: bool = False
+    resolution_penalty_applied: bool = False
     diagnosed_component: str | None = None
     diagnosed_mode: str | None = None
     true_component: str
@@ -235,6 +242,18 @@ def grade(world: World) -> GradeBreakdown:
             f"-{wrong_penalty:.0f} applied to total."
         )
 
+    # Resolution requirement: root part replaced AND a successful start
+    # observed after the last replacement. Symptom relief from a wrong-part
+    # swap does not verify anything (root component check), and a correct
+    # repair the agent never cranked is an unverified fix.
+    fix_verified = root.component in world.replaced_components and world.fix_verified
+    if not fix_verified:
+        total = max(0.0, total - RESOLUTION_PENALTY)
+        details.append(
+            "Problem not verifiably resolved (root part replaced + successful "
+            f"start required); -{RESOLUTION_PENALTY:.0f} applied to total."
+        )
+
     if guessing:
         total = min(total, GUESSING_CAP)
         details.append(
@@ -250,6 +269,8 @@ def grade(world: World) -> GradeBreakdown:
         cost_efficiency=cost_pts,
         total=round(total, 2),
         guessing_penalty_applied=guessing,
+        fix_verified=fix_verified,
+        resolution_penalty_applied=not fix_verified,
         diagnosed_component=diagnosed_component.value if diagnosed_component else None,
         diagnosed_mode=diagnosed_mode.value if diagnosed_mode else None,
         true_component=root.component.value,

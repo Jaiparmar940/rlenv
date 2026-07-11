@@ -36,12 +36,15 @@ def test_scripted_expert_scores_100(tmp_path) -> None:
         ("measure_voltage", {"point_a": "battery_negative",
                              "point_b": "engine_block",
                              "engine_state": "cranking"}),
+        ("replace_part", {"component": "ground_strap"}),
+        ("attempt_start", {}),
         ("finish", {"answer": "ground_strap corroded"}),
     )
     sample = _run(model, "medium_corroded_ground", tmp_path)
     score = sample.scores[SCORER]
     assert score.value == 100.0
     assert score.metadata["true_component"] == "ground_strap"
+    assert score.metadata["fix_verified"]
     assert not score.metadata["guessing_penalty_applied"]
 
 

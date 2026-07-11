@@ -25,8 +25,12 @@ class ScenarioDef(BaseModel):
     seed: int
     complaint: str
     root_cause: InjectedFault
+    # Full-resolution expert baseline: diagnose, replace the root-cause part,
+    # and verify with a successful start. Derived from the costs.py model for
+    # an explicit expert action sequence (documented per scenario below) —
+    # never hand-tuned independently of that sequence.
     expert_baseline_cost: dict[str, float] = Field(
-        description="Expert baseline: minutes and dollars"
+        description="Expert baseline (minutes and dollars), incl. repair + verify"
     )
     # Marginal non-causal RESTING node potentials (red herring). Keyed by node
     # name (e.g. "battery_positive"); applied at key_off/key_on only, never at
@@ -49,7 +53,9 @@ SCENARIOS: dict[str, ScenarioDef] = {
             component=Component.BATTERY,
             mode=FailureMode.DEAD,
         ),
-        expert_baseline_cost={"minutes": 15.0, "dollars": 0.0},  # TODO(VERIFY)
+        # Expert path: attempt_start (1) + battery voltage key_off (3)
+        # + replace battery (20, $180) + verify start (1) = 25 min, $180.
+        expert_baseline_cost={"minutes": 25.0, "dollars": 180.0},
     ),
     "medium_corroded_ground": ScenarioDef(
         id="medium_corroded_ground",
@@ -64,7 +70,10 @@ SCENARIOS: dict[str, ScenarioDef] = {
             mode=FailureMode.CORRODED,
             severity={"added_resistance_ohms": 1.1},  # TODO(VERIFY)
         ),
-        expert_baseline_cost={"minutes": 35.0, "dollars": 25.0},  # TODO(VERIFY): strap cost
+        # Expert path: attempt_start (1) + 4 measurements (battery key_off,
+        # battery cranking, ground drop cranking, feed drop cranking; 12)
+        # + replace ground_strap (20, $25) + verify start (1) = 34 min, $25.
+        expert_baseline_cost={"minutes": 34.0, "dollars": 25.0},
     ),
     "medium_ground_red_herring_battery": ScenarioDef(
         id="medium_ground_red_herring_battery",
@@ -86,7 +95,10 @@ SCENARIOS: dict[str, ScenarioDef] = {
             "battery_positive": 11.8,  # TODO(VERIFY): marginal but not dead; resting only
         },
         red_herring_component=Component.BATTERY,
-        expert_baseline_cost={"minutes": 40.0, "dollars": 25.0},  # TODO(VERIFY)
+        # Expert path: corroded-ground path (34 min, $25) + one extra battery
+        # cross-check under load to rule out the marginal-battery bait (3)
+        # = 37 min, $25.
+        expert_baseline_cost={"minutes": 37.0, "dollars": 25.0},
     ),
 }
 
