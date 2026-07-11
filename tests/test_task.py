@@ -70,13 +70,18 @@ def test_no_ground_truth_in_agent_visible_messages(tmp_path) -> None:
                              "engine_state": "cranking"}),
         ("finish", {"answer": "it is broken"}),
     )
-    sample = _run(model, "medium_ground_red_herring_battery", tmp_path)
+    scenario_id = "medium_ground_red_herring_battery"
+    sample = _run(model, scenario_id, tmp_path)
     true_mode = sample.scores[SCORER].metadata["true_mode"]  # "corroded"
 
     for message in sample.messages:
+        text = (getattr(message, "text", "") or "").lower()
+        # The scenario id spells out the answer; it must NEVER be visible,
+        # not even in the post-finish echo.
+        assert scenario_id not in text, f"scenario id leaked in {message.role}"
+        assert "red_herring" not in text
         if message.role == "assistant":
             calls = getattr(message, "tool_calls", None) or []
             if any(c.function == "finish" for c in calls):
                 break  # everything after is the agent's own submission echo
-        text = (getattr(message, "text", "") or "").lower()
         assert true_mode not in text, f"ground truth leaked in {message.role}"
