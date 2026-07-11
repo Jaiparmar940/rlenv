@@ -172,6 +172,55 @@ class TestResolutionPenalty:
         assert not result.fix_verified
         assert result.resolution_penalty_applied
 
+    def test_blind_swap_hits_guessing_cap(self) -> None:
+        # Replace-crank-finish with zero measurements before the repair: the
+        # verify crank must NOT count as the probe that dodges the cap.
+        result = _run_agent(
+            "easy_dead_battery",
+            [
+                ("replace_part", "battery"),
+                ("attempt_start",),
+                ("finish", "dead battery"),
+            ],
+        )
+        assert result.fix_verified  # repair itself is legitimate...
+        assert result.guessing_penalty_applied  # ...but it was a guess
+        assert result.total <= GUESSING_CAP
+
+    def test_flailing_inspection_debits_total(self) -> None:
+        # Correct diagnosis, clean hands, verified fix — but 60 min of probing
+        # vs the 25-min expert (2.4x). Cost goes negative: 15*(2-2.4) = -6,
+        # so total = 60 + 25 - 6 = 79.
+        batt = ("battery_positive", "battery_negative")
+        result = _run_agent(
+            "easy_dead_battery",
+            [
+                ("attempt_start",),
+                ("read_pid", "battery_voltage"),
+                ("read_pid", "alt_output_v"),
+                ("read_pid", "rpm"),
+                ("read_pid", "can_status"),
+                ("measure_voltage", *batt, "cranking"),
+                ("measure_voltage", *batt, "key_off"),
+                ("measure_voltage", *batt, "key_on"),
+                ("visual_inspect", "ground_strap"),
+                ("visual_inspect", "battery"),
+                ("replace_part", "battery"),
+                ("scan_dtcs",),
+                ("attempt_start",),
+                ("read_pid", "can_status"),
+                ("measure_voltage", *batt, "key_on"),
+                ("measure_voltage", *batt, "key_off"),
+                ("measure_voltage", "engine_block", "battery_negative", "key_off"),
+                ("measure_voltage", "engine_block", "alt_output", "key_off"),
+                ("finish", "dead battery"),
+            ],
+        )
+        assert result.root_cause == 60.0
+        assert result.fix_verified
+        assert result.cost_efficiency == -6.0
+        assert result.total == 79.0
+
     def test_wrong_part_relief_does_not_verify(self) -> None:
         # Red herring: swap the innocent battery, car still slow-cranks.
         result = _run_agent(

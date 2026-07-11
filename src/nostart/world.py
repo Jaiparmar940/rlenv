@@ -99,7 +99,11 @@ class World:
         self._finished = False
         self._diagnosis: str | None = None
         self._action_count = 0
-        self._probe_count = 0  # measurements for guessing penalty (grader phase 2)
+        self._probe_count = 0  # all probes (any time)
+        # Probes taken BEFORE the first replacement. The guessing cap keys on
+        # this: a blind part-swap whose verify crank is its only "probe" is
+        # still guessing — diagnosis must precede repair.
+        self._diagnostic_probe_count = 0
         self._crank_attempts = 0
         # True once attempt_start returns "starts" with no replacement after it.
         # Grader combines this with root-component-replaced to require a
@@ -123,6 +127,16 @@ class World:
     @property
     def probe_count(self) -> int:
         return self._probe_count
+
+    @property
+    def diagnostic_probe_count(self) -> int:
+        """Probes taken before any part was replaced."""
+        return self._diagnostic_probe_count
+
+    def _note_probe(self) -> None:
+        self._probe_count += 1
+        if not self._replaced_components:
+            self._diagnostic_probe_count += 1
 
     @property
     def fix_verified(self) -> bool:
@@ -189,7 +203,7 @@ class World:
 
     def scan_dtcs(self) -> list[dict[str, str]]:
         self._charge_action("scan_dtcs")
-        self._probe_count += 1
+        self._note_probe()
         symptoms = self._resolve(EngineState.KEY_ON)
         if not self._intermittent_manifests(symptoms.intermittency, "scan_dtcs"):
             return []
@@ -198,7 +212,7 @@ class World:
 
     def read_pid(self, pid: str) -> dict[str, Any]:
         self._charge_action("read_pid")
-        self._probe_count += 1
+        self._note_probe()
         key = pid.strip().lower()
         symptoms = self._resolve(EngineState.KEY_ON)
 
@@ -239,7 +253,7 @@ class World:
         Raises ValueError on an unknown node name or engine state.
         """
         self._charge_action("measure_voltage")
-        self._probe_count += 1
+        self._note_probe()
         a = point_a.strip().lower()
         b = point_b.strip().lower()
         for node in (a, b):
@@ -273,7 +287,7 @@ class World:
 
     def visual_inspect(self, area: str) -> str:
         self._charge_action("visual_inspect")
-        self._probe_count += 1
+        self._note_probe()
         comp = normalize_component(area)
         if comp is None:
             return "Area not recognized; no useful observation."
@@ -305,7 +319,7 @@ class World:
 
     def attempt_start(self) -> dict[str, str]:
         self._charge_action("attempt_start")
-        self._probe_count += 1
+        self._note_probe()
         self._crank_attempts += 1
         symptoms = self._resolve(EngineState.CRANKING)
         if not self._intermittent_manifests(symptoms.intermittency, "attempt_start"):

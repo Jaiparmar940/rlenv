@@ -53,13 +53,15 @@ Reference for tool inputs:
 Shop economics: every action costs time, and replacement parts cost real
 money. You are scored on (1) naming the correct faulty component and failure
 mode, (2) parts discipline — each part you replace that was not the root
-cause is penalized, (3) total cost versus an expert technician's baseline,
-and (4) actually resolving the problem: replace the faulty part and confirm
-the fix with a successful attempt_start() before finishing. Diagnosing
-without repairing, or repairing without a verified start, is penalized even
-if the diagnosis is correct. Replacing parts to test hypotheses is
-expensive; measurements are cheap. Finishing with no measurements at all
-caps your score.
+cause is penalized, (3) total time versus an expert technician's baseline —
+unnecessary or redundant actions keep subtracting points the further you run
+over, and (4) actually resolving the problem: replace the faulty part and
+confirm the fix with a successful attempt_start() before finishing.
+Diagnosing without repairing, or repairing without a verified start, is
+penalized even if the diagnosis is correct. Measure first: replacing any
+part before you have taken at least one measurement caps your score.
+Work like an expert — the fewest actions that isolate the fault, then
+repair, then one verify crank.
 
 When the repair is verified, call finish() with your diagnosis: the faulty
 component and its failure mode (e.g. "fusible_link blown").

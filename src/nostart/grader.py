@@ -31,10 +31,14 @@ WRONG_PART_PENALTY = 8.0
 RESOLUTION_PENALTY = 15.0
 COMPONENT_ONLY_CREDIT = ROOT_CAUSE_MAX / 2.0
 
-# Map dollars to minute-equivalents for cost-efficiency scaling.
-# $2 ≈ 1 minute (~$120/hr shop rate), so parts money genuinely hurts:
-# a $180 battery costs the same as 90 minutes of diagnostic time.
-DOLLARS_PER_MINUTE_EQUIV = 2.0  # TODO(VERIFY)
+# Cost efficiency is TIME-ONLY. Parts dollars are policed by parts discipline
+# (wrong parts) and are identical to the expert's for the correct repair, so
+# folding them into the cost ratio only dilutes wasted diagnostic time — a
+# $180 battery on both sides made a 2.4x time overrun look like 1.3x.
+# Linear decay: full points at/below expert time, zero at 2x expert time,
+# NEGATIVE beyond (debits the total, mirroring the wrong-part rule) — there
+# is no flail-freely zone past the bucket floor.
+COST_ZERO_AT_RATIO = 2.0
 
 
 class GradeBreakdown(BaseModel):
@@ -158,10 +162,6 @@ def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | N
     return component, mode
 
 
-def _combined_cost(minutes: float, dollars: float) -> float:
-    return minutes + dollars / DOLLARS_PER_MINUTE_EQUIV
-
-
 def score_root_cause(
     true_component: Component,
     true_mode: FailureMode,
@@ -191,17 +191,17 @@ def score_parts_discipline(
 
 def score_cost_efficiency(
     agent_minutes: float,
-    agent_dollars: float,
     baseline: dict[str, float],
 ) -> float:
-    expert = _combined_cost(baseline["minutes"], baseline["dollars"])
-    agent = _combined_cost(agent_minutes, agent_dollars)
-    if agent <= 0:
-        return 0.0
-    if agent <= expert:
+    expert = baseline["minutes"]
+    if agent_minutes <= 0:
+        return 0.0  # finish-only episode; nothing to reward
+    ratio = agent_minutes / expert
+    if ratio <= 1.0:
         return COST_EFFICIENCY_MAX
-    ratio = expert / agent
-    return round(COST_EFFICIENCY_MAX * min(1.0, ratio), 2)
+    # Falls through zero at COST_ZERO_AT_RATIO and keeps going negative.
+    scale = (COST_ZERO_AT_RATIO - ratio) / (COST_ZERO_AT_RATIO - 1.0)
+    return round(COST_EFFICIENCY_MAX * scale, 2)
 
 
 def grade(world: World) -> GradeBreakdown:
@@ -223,12 +223,14 @@ def grade(world: World) -> GradeBreakdown:
     )
     cost_pts = score_cost_efficiency(
         snapshot.cumulative_cost.minutes,
-        snapshot.cumulative_cost.dollars,
         scenario.expert_baseline_cost,
     )
 
     total = root_pts + parts_pts + cost_pts
-    guessing = world.probe_count == 0
+    # Guessing = no probe BEFORE the first replacement. Total probe count is
+    # not enough: the required verify crank would hand every blind part-swap
+    # a free probe and make this cap dead code.
+    guessing = world.diagnostic_probe_count == 0
     details: list[str] = []
 
     # Wrong parts debit the TOTAL, not just the clamped discipline bucket:
@@ -262,6 +264,8 @@ def grade(world: World) -> GradeBreakdown:
 
     if diagnosed_component != root.component:
         details.append("Root cause component mismatch (symptom masking ignored).")
+
+    total = max(0.0, total)  # negative cost_pts must not push the total below 0
 
     return GradeBreakdown(
         root_cause=root_pts,
