@@ -6,9 +6,15 @@ An agentic RL environment + eval: a simulated vehicle with electrical no-start/c
 
 ## Division of labor (important)
 
-- **Cursor** has been executing phased build prompts. Check `git status`/`git log` before touching anything — do not duplicate or clobber in-flight Cursor work. If a file was just modified, ask before rewriting it.
+- **Cursor** executed the initial phased build (Phase 1 skeleton). Check `git status`/`git log` before touching anything — do not duplicate or clobber in-flight work from another tool. If a file was just modified, ask before rewriting it.
 - **The human (Jaivir) is the domain verifier.** He has caught four physics bugs that passed the automated test suite (load-sag inversion; downstream node reading above upstream; red-herring battery drifting into genuinely-weak territory; ground-fault drop too small to characterize). When physics is uncertain, FLAG IT — never guess plausible-looking numbers. Plausible-but-wrong is the failure mode this whole product exists to prevent.
-- **Claude Code (you):** implementation, tests, refactors, transcript analysis, writeup drafting. Stop at phase checkpoints for human sign-off.
+- **Claude Code (you):** implementation, tests, refactors, transcript analysis, writeup drafting. Stop at phase checkpoints for human sign-off. **Keep this file's "Current state" section up to date as work lands, and commit it with the change it describes.**
+
+## Dev environment (this machine)
+
+- Run everything via `.venv/bin/python` (uv-managed CPython 3.12; system python3 is 3.9 and unusable). `uv pip install -e ".[dev]"` after a fresh clone.
+- Provider keys live in gitignored `.env` (template: `.env.example`); `scripts/run_evals.py` loads it.
+- A throwaway mobile play UI (NOT in the repo, per v0.1 rules) lives at `~/nostart-webapp/app.py`; serve on :8642 and expose with `cloudflared tunnel --url http://localhost:8642`.
 
 ## Architecture
 
@@ -30,16 +36,25 @@ An agentic RL environment + eval: a simulated vehicle with electrical no-start/c
 ## Scenarios (Phase 1 set)
 
 - `easy_dead_battery` — battery ≈ 2.1 V all states, no_click, ground drop ≈ 0. VERIFIED by play.
-- `medium_corroded_ground` — good battery; ground drop large only under cranking; slow_crank.
-- `medium_ground_red_herring_battery` — resting path suppressed to ~11.8 V (bait); cranking: battery holds, ground drop is the tell.
+- `medium_corroded_ground` (1.1 Ω strap) — good battery; cranking: battery ~11.45 V, ground drop ~2.75 V, feed ~0.2 V; slow_crank. VERIFIED by play.
+- `medium_ground_red_herring_battery` (1.2 Ω strap) — resting path suppressed to ~11.8 V (bait, cleared if battery replaced); cranking: battery holds ~11.6 V, ground drop ~3.0 V is the tell. VERIFIED by play.
 
-## Current state & task queue (in order)
+## Current state (updated 2026-07-11)
 
-1. **PENDING — ground-drop magnitude fix** (prompt: cursor-fix-ground-drop-magnitude.md, may already be partially applied by Cursor — check first). Targets at cranking for both ground scenarios: battery (pos→neg) ≥ ~11.3 V; ground drop (neg→engine_block) ≥ ~2.5 V; positive feed (pos→stud) ≤ ~0.5 V. Achieve by adjusting resistances/current, not authored voltages.
-2. **`scripts/sanity_check.py` green** — standalone checker (no pytest/grader/Inspect imports); asserts the invariants above incl. the localization property; exits non-zero on failure. Build it if Cursor hasn't.
-3. **Phase 2 — grader.py + tests:** score 0–100 (root cause 60 / parts discipline 25, −8 per wrong part / cost efficiency 15 vs expert baseline, $2 ≈ 1 min). Wrong-part penalty ALSO debits the total (not just the clamped bucket) so a measure-once parts-cannon can't ride root-cause points past 50. Anti-cheat: symptom masking ≠ success (grader reads true world state); finish() with no measurements caps at 40. `test_grader.py` must defeat four adversarial agents: parts-cannon, measured-parts-cannon, lucky-guesser, symptom-masker. CHECKPOINT: run them in front of the human — DONE 2026-07-10 (scores 29.3 / 29.3 / 40 / 15.9, all < 50).
-4. **Phase 3 — task.py (Inspect) + scripts/run_evals.py:** run ≥2 real model APIs × 3 scenarios → deterministic markdown results table + full transcripts. CHECKPOINT: human reads transcripts, tags failure modes.
-5. **Publish prep:** README (quickstart, results table, failure-mode taxonomy, honest known-gaps/limitations section, v0.2 notes: direct two-point drop-test framing, more scenarios), repo hygiene, human baseline row in the table.
+**DONE:**
+
+1. **Phase 1 — environment + scenarios.** Ground-drop magnitude fix applied to spec (scenario resistances 1.1/1.2 Ω, GROUND_CURRENT_RECOVERY 0.6); red herring clears when its component (battery) is replaced. DOMAIN_TRUTH.md signed off by Jaivir 2026-07-10.
+2. **`scripts/sanity_check.py` green**, thresholds pinned to the spec targets (battery ≥ 11.3, drop ≥ 2.5, feed ≤ 0.5) so a too-soft fix cannot pass.
+3. **Phase 2 — grader.py + tests:** score 0–100 (root cause 60 / parts discipline 25, −8 per wrong part / cost efficiency 15 vs expert baseline, $2 ≈ 1 min). Wrong-part penalty ALSO debits the total so a measure-once parts-cannon can't ride root-cause points past 50. Anti-cheat: symptom masking ≠ success; finish() with no measurements caps at 40. Four adversarial agents defeated. CHECKPOINT DONE 2026-07-10 (29.3 / 29.3 / 40 / 15.9, all < 50; expert 100).
+4. **Phase 3 — src/nostart/task.py (Inspect) + scripts/run_evals.py built and run** (3 models × 3 scenarios × 3 epochs, 2026-07-10). Real prose broke the diagnosis parser twice (length-based component match; enum-order mode match hijacked by red-herring exoneration wording) — both fixed with positional + component-valid-mode matching, regression-tested against the actual model answers. Current means: claude-sonnet-5 99.6, claude-fable-5 94.1, gpt-5.5 77.0.
+
+**OPEN — decisions on Jaivir (block the final published table):**
+
+- **Scores look inflated; causes identified:** (a) system prompt's topology sentence points at the ground path — neutral-prompt rerun proposed, not yet run; (b) rubric floor is high (component-only 30 + clean-hands 25 + terse 15 = 70); (c) visual_inspect reveals strap corrosion 40% of the time — electrical localization should be the only reliable tell?; (d) gpt-5.5's gap is pure mode vocabulary ("internally failed/shorted" vs dead, "high resistance" vs corroded) — accepting synonyms ≈ 97.
+- **Expert-baseline semantics inconsistent:** easy is diagnose-only (15 min/$0) while ground baselines include repair — models that repair+verify on easy lose ~13 cost points.
+- **Phase 3 CHECKPOINT:** Jaivir reads `results/transcripts/`, tags failure modes. Banked so far from human play: supply-referenced readings hide ground faults; wrong ground reference frames an innocent starter.
+
+**THEN — publish prep:** README (quickstart, results table, failure-mode taxonomy, honest known-gaps: feed drop not current-scaled, single-vehicle ground topology assumption, mode-vocabulary strictness; v0.2 notes: harder scenario set — intermittents, co-faults, more scenarios), human baseline row, repo hygiene. Publish Monday 2026-07-13.
 
 ## Definition of done (v0.1)
 
