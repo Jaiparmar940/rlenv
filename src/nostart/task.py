@@ -42,8 +42,7 @@ anything except through them.
 Reference for tool inputs:
 - measure_voltage nodes: battery_positive, battery_negative, engine_block,
   starter_stud, alt_output, chassis. starter_stud is the B+ terminal on the
-  starter solenoid. In this vehicle the battery negative cable lands on the
-  chassis, and the engine is grounded through an engine-to-chassis strap.
+  starter solenoid.
 - engine states: key_off, key_on, cranking.
 - read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status.
 - components (visual_inspect / replace_part): battery, ground_strap,
