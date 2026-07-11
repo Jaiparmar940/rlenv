@@ -14,7 +14,7 @@ An agentic RL environment + eval: a simulated vehicle with electrical no-start/c
 
 - Run everything via `.venv/bin/python` (uv-managed CPython 3.12; system python3 is 3.9 and unusable). `uv pip install -e ".[dev]"` after a fresh clone.
 - Provider keys live in gitignored `.env` (template: `.env.example`); `scripts/run_evals.py` loads it.
-- A throwaway mobile play UI (NOT in the repo, per v0.1 rules) lives at `~/nostart-webapp/app.py`; serve on :8642 and expose with `cloudflared tunnel --url http://localhost:8642`.
+- Mobile play UI: `scripts/webapp.py` (serves :8642; expose with `cloudflared tunnel --url http://localhost:8642`). Committed 2026-07-11 by Jaivir's call as a dev/verification tool — may be removed before/after publish.
 
 ## Architecture
 
@@ -63,6 +63,6 @@ An agentic RL environment + eval: a simulated vehicle with electrical no-start/c
 ## Do not
 
 - Hand-author voltages; leak ground truth into any observation; break determinism.
-- Add RL training code, web UI, Docker, or CI in v0.1.
+- Add RL training code, Docker, or CI in v0.1. (Web-UI ban lifted 2026-07-11: `scripts/webapp.py` is committed as a dev/play tool; candidate for removal later.)
 - Mark any phase done without its human checkpoint.
 - Silently "fix" physics you're unsure of — surface it as a question with your best guess and the reason for doubt.
