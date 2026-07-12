@@ -25,6 +25,7 @@ from inspect_ai.util import store
 
 from nostart.domain.scenarios import get_scenario, list_scenarios
 from nostart.grader import grade
+from nostart.prompts import PROMPTS
 from nostart.tools import ToolSession
 
 # Sessions hold live World objects (ground truth). They stay in this process
@@ -33,38 +34,6 @@ from nostart.tools import ToolSession
 _SESSIONS: dict[str, ToolSession] = {}
 _SESSION_KEY = "nostart:session_key"
 
-SYSTEM_PROMPT = """\
-You are an experienced automotive electrical technician. A vehicle in your
-bay will not start; the customer complaint is in the first message. Diagnose
-the ROOT CAUSE using only the tools provided — you cannot see or touch
-anything except through them.
-
-Reference for tool inputs:
-- measure_voltage nodes: battery_positive, battery_negative, engine_block,
-  starter_stud, alt_output, chassis. starter_stud is the B+ terminal on the
-  starter solenoid.
-- engine states: key_off, key_on, cranking.
-- read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status.
-- components (visual_inspect / replace_part): battery, ground_strap,
-  starter_relay, starter_motor, alternator, fusible_link, ignition_switch,
-  ecu_can_node.
-
-Shop economics: every action costs time, and replacement parts cost real
-money. You are scored on (1) naming the correct faulty component and failure
-mode, (2) parts discipline — each part you replace that was not the root
-cause is penalized, (3) total time versus an expert technician's baseline —
-unnecessary or redundant actions keep subtracting points the further you run
-over, and (4) actually resolving the problem: replace the faulty part and
-confirm the fix with a successful attempt_start() before finishing.
-Diagnosing without repairing, or repairing without a verified start, is
-penalized even if the diagnosis is correct. Measure first: replacing any
-part before you have taken at least one measurement caps your score.
-Work like an expert — the fewest actions that isolate the fault, then
-repair, then one verify crank.
-
-When the repair is verified, call finish() with your diagnosis: the faulty
-component and its failure mode (e.g. "fusible_link blown").
-"""
 
 
 def _session() -> ToolSession:
@@ -247,13 +216,24 @@ def _make_sample(scenario_id: str) -> Sample:
 
 
 @task
-def no_start(scenarios: str = "all", message_limit: int = 50) -> Task:
+def no_start(
+    scenarios: str = "all",
+    message_limit: int = 50,
+    prompt_variant: str = "uncoached",
+) -> Task:
     """Vehicle no-start electrical diagnosis.
 
     Args:
         scenarios: "all" or comma-separated scenario ids.
         message_limit: Max conversation messages before the episode is cut off.
+        prompt_variant: "uncoached" (default: no strategy, no grader rules)
+            or "coached" (previous prompt, kept as an A/B condition).
     """
+    if prompt_variant not in PROMPTS:
+        raise ValueError(
+            f"Unknown prompt_variant '{prompt_variant}'. "
+            f"Valid: {sorted(PROMPTS)}"
+        )
     ids = list_scenarios() if scenarios == "all" else [
         s.strip() for s in scenarios.split(",") if s.strip()
     ]
@@ -262,7 +242,7 @@ def no_start(scenarios: str = "all", message_limit: int = 50) -> Task:
         dataset=dataset,
         setup=init_session(),
         solver=basic_agent(
-            init=system_message(SYSTEM_PROMPT),
+            init=system_message(PROMPTS[prompt_variant]),
             tools=ALL_TOOLS,
             message_limit=message_limit,
             submit_name="finish",

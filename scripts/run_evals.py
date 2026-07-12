@@ -39,6 +39,7 @@ from inspect_ai.log import EvalLog  # noqa: E402
 from inspect_ai.model import ModelOutput, get_model  # noqa: E402
 
 from nostart.domain.scenarios import list_scenarios  # noqa: E402
+from nostart.grader import ROOT_CAUSE_MAX  # noqa: E402
 from nostart.task import no_start  # noqa: E402
 
 SCORER_NAME = "nostart_grader"
@@ -89,9 +90,11 @@ def _msg_text(message) -> str:
     return text.strip()
 
 
-def render_transcript(model_name: str, sample) -> str:
+def render_transcript(model_name: str, sample, variant: str) -> str:
     lines = [
         f"# {model_name} — {sample.id} (epoch {sample.epoch})",
+        "",
+        f"prompt-variant: **{variant}**",
         "",
     ]
     score = sample.scores.get(SCORER_NAME) if sample.scores else None
@@ -121,7 +124,7 @@ def render_transcript(model_name: str, sample) -> str:
     return "\n".join(lines) + "\n"
 
 
-def collect_rows(logs: list[EvalLog]) -> list[dict]:
+def collect_rows(logs: list[EvalLog], variant: str) -> list[dict]:
     rows = []
     for log in logs:
         model_name = str(log.eval.model)
@@ -136,10 +139,17 @@ def collect_rows(logs: list[EvalLog]) -> list[dict]:
                 "model": model_name,
                 "scenario": str(sample.id),
                 "epoch": sample.epoch,
+                "variant": variant,
                 "total": score.value if score else 0.0,
                 "root": meta.get("root_cause", 0.0),
                 "parts": meta.get("parts_discipline", 0.0),
                 "cost": meta.get("cost_efficiency", 0.0),
+                "root_ok": meta.get("root_cause", 0.0) >= ROOT_CAUSE_MAX,
+                "fix_verified": bool(meta.get("fix_verified", False)),
+                # Discipline behavior the coached prompt dictated: at least
+                # one diagnostic probe before the first replacement.
+                "measured_first": not meta.get("guessing_penalty_applied",
+                                               False),
                 "guess_cap": meta.get("guessing_penalty_applied", False),
                 "wrong_parts": ", ".join(meta.get("wrong_parts_replaced", [])),
                 "diagnosis": (score.answer or "").replace("\n", " ")[:60]
@@ -152,35 +162,85 @@ def collect_rows(logs: list[EvalLog]) -> list[dict]:
     return rows
 
 
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
+
+
+def _rate(flags: list[bool]) -> str:
+    return f"{sum(flags)}/{len(flags)}" if flags else "0/0"
+
+
 def write_results(rows: list[dict], out_dir: Path) -> Path:
+    variants = sorted({r["variant"] for r in rows})
     lines = [
         "# no-start-env results",
         "",
-        f"Generated {date.today().isoformat()} at commit `{_git_commit()}`.",
+        f"Generated {date.today().isoformat()} at commit `{_git_commit()}`."
+        f" Prompt variant(s): {', '.join(variants)}.",
         "Score 0-100: root cause 60 / parts discipline 25 / cost efficiency 15"
         " (time-only vs expert baseline, zero at 2x, negative beyond). Wrong"
         " parts -8 each (also debited from total). -15 unless the root-cause"
         " part was replaced and a successful start verified it. Replacing"
         " before any measurement caps at 40.",
         "",
-        "| model | scenario | epoch | total | root | parts | cost | guess cap"
-        " | wrong parts | diagnosis |",
-        "|---|---|---:|---:|---:|---:|---:|---|---|---|",
+        "## Per model x scenario (aggregated over epochs)",
+        "",
+        "pass^k = every epoch earned full root-cause credit"
+        " (component AND mode). root-ok = fraction of epochs with full"
+        " root-cause credit. verified-fix / measured-first = fraction of"
+        " epochs with the behavior.",
+        "",
+        "| model | scenario | k | mean | min | root | parts | cost | pass^k"
+        " | root-ok | verified-fix | measured-first |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---|---|---|---|",
+    ]
+
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for r in rows:
+        groups.setdefault((r["model"], r["scenario"]), []).append(r)
+
+    for (model_name, scenario), episodes in sorted(groups.items()):
+        totals = [float(e["total"]) for e in episodes]
+        root_flags = [e["root_ok"] for e in episodes]
+        lines.append(
+            f"| {model_name} | {scenario} | {len(episodes)}"
+            f" | {_mean(totals):.1f} | {min(totals):.1f}"
+            f" | {_mean([e['root'] for e in episodes]):.0f}"
+            f" | {_mean([e['parts'] for e in episodes]):.0f}"
+            f" | {_mean([e['cost'] for e in episodes]):.1f}"
+            f" | {'PASS' if all(root_flags) else 'fail'}"
+            f" | {_rate(root_flags)}"
+            f" | {_rate([e['fix_verified'] for e in episodes])}"
+            f" | {_rate([e['measured_first'] for e in episodes])} |"
+        )
+
+    by_model: dict[str, list[float]] = {}
+    for r in rows:
+        by_model.setdefault(r["model"], []).append(float(r["total"]))
+    model_means = {m: _mean(v) for m, v in by_model.items()}
+    lines += ["", "## Summary", "", "| model | mean total |", "|---|---:|"]
+    for model_name in sorted(model_means):
+        lines.append(f"| {model_name} | {model_means[model_name]:.1f} |")
+    if len(model_means) >= 2:
+        spread = max(model_means.values()) - min(model_means.values())
+        lines += ["", f"Best-worst model spread (separation): "
+                      f"**{spread:.1f}** points."]
+    lines += [
+        "",
+        "## Per-episode detail",
+        "",
+        "| model | scenario | epoch | variant | total | root | parts | cost"
+        " | guess cap | wrong parts | diagnosis |",
+        "|---|---|---:|---|---:|---:|---:|---:|---|---|---|",
     ]
     for r in rows:
         lines.append(
-            f"| {r['model']} | {r['scenario']} | {r['epoch']} | {r['total']:.1f}"
+            f"| {r['model']} | {r['scenario']} | {r['epoch']} | {r['variant']}"
+            f" | {r['total']:.1f}"
             f" | {r['root']:.0f} | {r['parts']:.0f} | {r['cost']:.2f}"
             f" | {'yes' if r['guess_cap'] else ''} | {r['wrong_parts']}"
             f" | {r['diagnosis']} |"
         )
-    lines += ["", "## Per-model means", "", "| model | mean total |", "|---|---:|"]
-    by_model: dict[str, list[float]] = {}
-    for r in rows:
-        by_model.setdefault(r["model"], []).append(float(r["total"]))
-    for model_name in sorted(by_model):
-        vals = by_model[model_name]
-        lines.append(f"| {model_name} | {sum(vals) / len(vals):.1f} |")
     lines.append("")
 
     out = out_dir / "results.md"
@@ -196,18 +256,20 @@ def write_transcripts(rows: list[dict], out_dir: Path) -> Path:
     for r in rows:
         fname = (
             f"{_sanitize(r['model'])}__{_sanitize(r['scenario'])}"
-            f"__e{r['epoch']}.md"
+            f"__{r['variant']}__e{r['epoch']}.md"
         )
         (tdir / fname).write_text(
-            render_transcript(r["model"], r["sample"]), encoding="utf-8"
+            render_transcript(r["model"], r["sample"], r["variant"]),
+            encoding="utf-8",
         )
     return tdir
 
 
 def run_real(models: list[str], scenarios: str, epochs: int,
-             message_limit: int, log_dir: Path) -> list[EvalLog]:
+             message_limit: int, log_dir: Path, variant: str) -> list[EvalLog]:
     return inspect_eval(
-        no_start(scenarios=scenarios, message_limit=message_limit),
+        no_start(scenarios=scenarios, message_limit=message_limit,
+                 prompt_variant=variant),
         model=models,
         epochs=epochs,
         log_dir=str(log_dir),
@@ -216,7 +278,7 @@ def run_real(models: list[str], scenarios: str, epochs: int,
 
 
 def run_mock(scenario_ids: list[str], message_limit: int,
-             log_dir: Path) -> list[EvalLog]:
+             log_dir: Path, variant: str) -> list[EvalLog]:
     logs: list[EvalLog] = []
     for scenario_id in scenario_ids:
         script = MOCK_SCRIPTS[scenario_id]
@@ -228,7 +290,8 @@ def run_mock(scenario_ids: list[str], message_limit: int,
             ],
         )
         logs += inspect_eval(
-            no_start(scenarios=scenario_id, message_limit=message_limit),
+            no_start(scenarios=scenario_id, message_limit=message_limit,
+                     prompt_variant=variant),
             model=model,
             log_dir=str(log_dir),
             display="none",
@@ -250,6 +313,12 @@ def main() -> int:
     parser.add_argument("--out", default=str(REPO / "results"))
     parser.add_argument("--mock", action="store_true",
                         help="Offline pipeline check with a scripted expert")
+    parser.add_argument(
+        "--prompt-variant", choices=["uncoached", "coached"],
+        default="uncoached",
+        help="Agent system prompt: uncoached (default; no strategy, no "
+             "grader rules) or coached (previous prompt, A/B condition)",
+    )
     args = parser.parse_args()
 
     out_dir = Path(args.out)
@@ -262,7 +331,8 @@ def main() -> int:
     )
 
     if args.mock:
-        logs = run_mock(scenario_ids, args.message_limit, log_dir)
+        logs = run_mock(scenario_ids, args.message_limit, log_dir,
+                        args.prompt_variant)
     else:
         if not args.models:
             parser.error(
@@ -272,10 +342,11 @@ def main() -> int:
         logs = run_real(
             [m.strip() for m in args.models.split(",")],
             args.scenarios, args.epochs, args.message_limit, log_dir,
+            args.prompt_variant,
         )
 
     failed = [log for log in logs if log.status != "success"]
-    rows = collect_rows(logs)
+    rows = collect_rows(logs, args.prompt_variant)
     results_path = write_results(rows, out_dir)
     tdir = write_transcripts(rows, out_dir)
 
