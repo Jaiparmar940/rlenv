@@ -87,6 +87,71 @@ class TestDiagnosisParsing:
         comp, _ = parse_diagnosis(text)
         assert comp == Component.BATTERY
 
+    # --- Real answers from the 2026-07-12 run that were correct but
+    # mis-scored; each pins a parser fix. ---
+
+    def test_hyphenated_compound_does_not_hijack_component(self) -> None:
+        # claude-sonnet-5 red-herring e1 (scored 0/60): "battery" inside
+        # "engine-to-battery" starts before "ground strap" does.
+        text = (
+            "Root cause: corroded/high-resistance engine-to-battery ground "
+            "strap (not the battery). Evidence: Battery rest voltage was "
+            "only slightly low (11.82V) and held up reasonably under "
+            "cranking (11.6V), so the battery itself wasn't the primary "
+            "culprit."
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.GROUND_STRAP
+        assert mode == FailureMode.CORRODED
+
+    def test_node_name_does_not_hijack_component(self) -> None:
+        # Measurement citations lead many answers; "battery negative" is a
+        # node, not a diagnosis.
+        text = (
+            "The 2.8V drop from battery negative to engine block under "
+            "cranking proves the ground strap is corroded."
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.GROUND_STRAP
+        assert mode == FailureMode.CORRODED
+
+    def test_high_resistance_maps_to_corroded_for_strap(self) -> None:
+        # grok-4 corroded-ground (all 3 epochs, scored 30/60): standard
+        # tech phrasing for exactly this fault.
+        comp, mode = parse_diagnosis("ground_strap high resistance (voltage drop)")
+        assert comp == Component.GROUND_STRAP
+        assert mode == FailureMode.CORRODED
+
+    def test_high_resistance_stays_literal_for_fusible_link(self) -> None:
+        comp, mode = parse_diagnosis("fusible_link high resistance")
+        assert comp == Component.FUSIBLE_LINK
+        assert mode == FailureMode.HIGH_RESISTANCE
+
+    def test_internally_failed_battery_is_dead(self) -> None:
+        # gpt-5.5 easy e1/e2 (scored 30/60). "corroded terminals" later in
+        # the answer must not bleed in (corroded is not a battery mode).
+        text = (
+            "battery internally failed / severely discharged. Key-off "
+            "battery voltage was only 2.13 V with corroded terminals and "
+            "sulfation odor; after replacing the battery, the engine "
+            "started successfully."
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.BATTERY
+        assert mode == FailureMode.DEAD
+
+    def test_internal_failure_shorted_cell_is_dead(self) -> None:
+        # claude-sonnet-5 easy e2 (scored 30/60).
+        text = (
+            "Root cause: Battery internal failure (shorted/sulfated cell "
+            "causing near-total loss of charge). Key-off terminal voltage "
+            "measured only 2.13V. Ground strap was intact and tight, "
+            "ruling out a grounding fault."
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.BATTERY
+        assert mode == FailureMode.DEAD
+
 
 class TestExpertAgent:
     """Sanity: a full-resolution expert path (diagnose, repair, verify) = 100."""

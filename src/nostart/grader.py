@@ -72,12 +72,32 @@ _MODE_ALIASES: dict[str, FailureMode] = {
     "diode": FailureMode.DIODE_FAILURE,
     "no_output": FailureMode.NO_OUTPUT,
     "blown": FailureMode.BLOWN,
-    "high_resistance": FailureMode.HIGH_RESISTANCE,
     "no_crank_signal": FailureMode.NO_CRANK_SIGNAL,
     "no_crank": FailureMode.NO_CRANK_SIGNAL,
     "accessory_drop": FailureMode.ACCESSORY_DROP,
     "bus_off": FailureMode.BUS_OFF,
     "intermittent": FailureMode.INTERMITTENT,
+}
+
+# Real-tech vocabulary that maps to a mode DEPENDING on the component:
+# candidates in priority order, resolved to the first one the diagnosed
+# component can actually have. Every entry is justified by an actual model
+# answer that was correct but scored component-only (2026-07-12 run):
+# "ground_strap high resistance" (grok-4, gpt-5.5), "battery internally
+# failed / severely discharged" (gpt-5.5), "battery internal failure
+# (shorted/sulfated cell)" (claude-sonnet-5). Keys are normalized tokens
+# (lowercase, spaces/hyphens -> underscores).
+_MODE_SYNONYMS: dict[str, tuple[FailureMode, ...]] = {
+    # A resistive strap is "corroded"; a resistive fusible link keeps its
+    # own enum. Unknown component defaults to the literal enum.
+    "high_resistance": (FailureMode.HIGH_RESISTANCE, FailureMode.CORRODED),
+    "excessive_resistance": (FailureMode.CORRODED, FailureMode.HIGH_RESISTANCE),
+    "internally_failed": (FailureMode.DEAD,),
+    "internal_failure": (FailureMode.DEAD,),
+    "internally_shorted": (FailureMode.DEAD,),
+    "shorted_cell": (FailureMode.DEAD,),
+    "sulfated": (FailureMode.DEAD,),
+    "discharged": (FailureMode.DEAD,),
 }
 
 
@@ -108,15 +128,37 @@ def parse_failure_mode(
         return _MODE_ALIASES[normalized]
 
     earliest: tuple[int, FailureMode] | None = None
-    candidates = [(mode.value, mode) for mode in FailureMode]
-    candidates += list(_MODE_ALIASES.items())
-    for needle, mode in candidates:
-        if not allowed(mode):
+    candidates: list[tuple[str, tuple[FailureMode, ...]]] = [
+        (mode.value, (mode,)) for mode in FailureMode
+    ]
+    candidates += [(needle, (mode,)) for needle, mode in _MODE_ALIASES.items()]
+    candidates += list(_MODE_SYNONYMS.items())
+    for needle, modes in candidates:
+        mode = next((m for m in modes if allowed(m)), None)
+        if mode is None:
             continue
         idx = normalized.find(needle)
         if idx >= 0 and (earliest is None or idx < earliest[0]):
             earliest = (idx, mode)
     return earliest[1] if earliest else None
+
+
+# Regions where a component name is NOT a diagnosis: measurement-node names
+# ("battery negative") and hyphenated compounds modifying another component
+# ("engine-to-battery ground strap" — which cost a fully correct
+# claude-sonnet-5 answer 60 points when first-mention matching read it as
+# "battery"). A component mention inside any such span is ignored.
+_SHIELD_PATTERNS = [
+    re.compile(r"battery[\s_-]+(positive|negative)"),
+    re.compile(r"\b[a-z_]+[\s_-]*-[\s_-]*to[\s_-]*-[\s_-]*[a-z_]+"),
+]
+
+
+def _shielded_spans(lowered: str) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    for pattern in _SHIELD_PATTERNS:
+        spans += [m.span() for m in pattern.finditer(lowered)]
+    return spans
 
 
 def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | None]:
@@ -132,10 +174,17 @@ def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | N
         # EARLIEST full-name mention wins: models lead with their diagnosis,
         # and later prose often mentions other components only to exonerate
         # them ("...starves the starter motor; battery is not the cause").
+        shields = _shielded_spans(lowered)
+
+        def visible(idx: int) -> bool:
+            return not any(start <= idx < end for start, end in shields)
+
         earliest: tuple[int, Component] | None = None
         for comp in Component:
             for needle in (comp.value, comp.value.replace("_", " ")):
                 idx = lowered.find(needle)
+                while idx >= 0 and not visible(idx):
+                    idx = lowered.find(needle, idx + 1)
                 if idx >= 0 and (earliest is None or idx < earliest[0]):
                     earliest = (idx, comp)
         if earliest is None:
@@ -152,9 +201,12 @@ def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | N
                 "can": Component.ECU_CAN_NODE,
             }
             for alias, comp in aliases.items():
-                match = re.search(rf"\b{re.escape(alias)}\b", lowered)
-                if match and (earliest is None or match.start() < earliest[0]):
-                    earliest = (match.start(), comp)
+                for match in re.finditer(rf"\b{re.escape(alias)}\b", lowered):
+                    if not visible(match.start()):
+                        continue
+                    if earliest is None or match.start() < earliest[0]:
+                        earliest = (match.start(), comp)
+                    break
         if earliest is not None:
             component = earliest[1]
 
