@@ -68,18 +68,25 @@ class TestChargingPhysics:
         # The exact trap: after a successful start, alt_output_v must show
         # charging voltage, and rpm must show idle — not key-on values.
         session = _started_easy_session()
-        alt = session.read_pid("alt_output_v")["value"]
-        assert alt >= 13.8
-        rpm = session.read_pid("rpm")["value"]
-        assert 600 <= rpm <= 800
+        alt = session.read_pid("alt_output_v")
+        assert alt["value"] >= 13.8
+        assert alt["engine_state"] == "running"
+        rpm = session.read_pid("rpm")
+        assert 600 <= rpm["value"] <= 800
+        assert rpm["engine_state"] == "running"
 
     def test_scan_tool_key_on_when_not_running(self) -> None:
-        # Engine off: alt post reads battery resting voltage. That is the
-        # honest engine-off physics, not an alternator fault.
+        # Engine off: alt post reads battery resting voltage — honest
+        # physics, and the payload SAYS it is a key_on read so it cannot
+        # masquerade as a failed alternator at idle. Tach reads 0.
         session = ToolSession("easy_dead_battery")
         session.replace_part("battery")
-        alt = session.read_pid("alt_output_v")["value"]
-        assert alt <= 12.7
+        alt = session.read_pid("alt_output_v")
+        assert alt["value"] <= 12.7
+        assert alt["engine_state"] == "key_on"
+        rpm = session.read_pid("rpm")
+        assert rpm["value"] == 0.0
+        assert rpm["engine_state"] == "key_on"
 
     def test_red_herring_bait_is_resting_only(self) -> None:
         # Strap fixed, ORIGINAL marginal battery still installed: running

@@ -222,13 +222,18 @@ class World:
         key = pid.strip().lower()
         # The scan tool is passive: it reflects the vehicle's CURRENT state.
         # After a successful start the engine is running and PIDs show
-        # charging-system values, not key-on ones.
+        # charging-system values, not key-on ones. Every payload names the
+        # state it was read in — instrument metadata, so an engine-off
+        # alt_output_v (rail voltage) cannot masquerade as a failed
+        # alternator at idle.
         state = EngineState.RUNNING if self._engine_running else EngineState.KEY_ON
         symptoms = self._resolve(state)
+        es = state.value
 
         if key == "battery_voltage":
             v = symptoms.potential_difference("battery_positive", "battery_negative")
-            return {"pid": "battery_voltage", "value": self._noise_band(v, 0.05), "unit": "V"}
+            return {"pid": "battery_voltage", "value": self._noise_band(v, 0.05),
+                    "unit": "V", "engine_state": es}
         if key == "alt_output_v":
             v = symptoms.potential_difference("alt_output", "battery_negative")
             # Add AC ripple component for diode failure (realistic scope reading avg).
@@ -236,26 +241,25 @@ class World:
                 if f.component == Component.ALTERNATOR and f.mode.value == "diode_failure":
                     sev = merge_severity(f)
                     v -= sev.get("ac_ripple_v", 0.0) * 0.1  # TODO(VERIFY): PID shows depressed avg
-            return {"pid": "alt_output_v", "value": self._noise_band(v, 0.08), "unit": "V"}
+            return {"pid": "alt_output_v", "value": self._noise_band(v, 0.08),
+                    "unit": "V", "engine_state": es}
         if key == "rpm":
-            rpm = 0.0
+            # A live tach read: 0 with the engine off, idle while running.
+            # (Crank speed is not observable here — attempt_start reports
+            # slow_crank directly, which carries the same information.)
             if self._engine_running:
-                rpm = IDLE_RPM
-            elif symptoms.crank_behavior == CrankBehavior.SLOW_CRANK:
-                rpm = 95.0  # TODO(VERIFY): slow crank RPM
-            elif symptoms.crank_behavior in (
-                CrankBehavior.CRANK_NO_START,
-                CrankBehavior.STARTS,
-            ):
-                rpm = 180.0  # TODO(VERIFY): normal crank RPM
-            return {"pid": "rpm", "value": self._noise_band(rpm, 5.0), "unit": "rpm"}
+                value = self._noise_band(IDLE_RPM, 5.0)
+            else:
+                value = 0.0
+            return {"pid": "rpm", "value": value, "unit": "rpm", "engine_state": es}
         if key == "can_status":
             status = symptoms.can_status.value
             if not self._intermittent_manifests(symptoms.intermittency, f"can_{pid}"):
                 status = CanStatus.OK.value
-            return {"pid": "can_status", "value": status, "unit": "enum"}
+            return {"pid": "can_status", "value": status, "unit": "enum",
+                    "engine_state": es}
 
-        return {"pid": key, "value": None, "unit": "unknown"}
+        return {"pid": key, "value": None, "unit": "unknown", "engine_state": es}
 
     def measure_voltage(
         self, point_a: str, point_b: str, engine_state: str

@@ -184,7 +184,7 @@ Installing a known-good part removes that component's fault from `_active_faults
 
 Added after an eval transcript showed a correct-thinking model framed for an alternator fault: it fixed the car, checked charging, and got engine-off voltages because no running state existed.
 
-**State machine:** `attempt_start` → `starts` sets the engine running. It stays running until something implies shutting it off: `replace_part` (wrenching on the car) or a `measure_voltage` in any non-running key state. Measuring in `running` while the engine is not running RAISES. `read_pid` is passive and reflects the current state (running values after a successful start, key_on otherwise); `rpm` reads idle ≈ 700 while running.
+**State machine:** `attempt_start` → `starts` sets the engine running. It stays running until something implies shutting it off: `replace_part` (wrenching on the car) or a `measure_voltage` in any non-running key state. Measuring in `running` while the engine is not running RAISES. `read_pid` is passive and reflects the current state (running values after a successful start, key_on otherwise); every PID payload names the `engine_state` it was read in, so an engine-off `alt_output_v` (rail voltage) is visibly not a charging measurement. `rpm` is a live tach: 0 with the engine off, ≈ 700 idle while running (crank speed is not observable via PID — `attempt_start` reports `slow_crank` directly).
 
 **Nominal running potentials** (alternator regulating at idle, modest charge current; all `TODO(VERIFY)`):
 
