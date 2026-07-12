@@ -41,6 +41,11 @@ COMPONENT_ONLY_CREDIT = ROOT_CAUSE_MAX / 2.0
 COST_ZERO_AT_RATIO = 2.0
 
 
+def _out_of(value: float, maximum: float) -> str:
+    fmt = lambda x: f"{x:g}"  # noqa: E731 — 60.0 -> "60", 13.24 -> "13.24"
+    return f"{fmt(value)}/{fmt(maximum)}"
+
+
 class GradeBreakdown(BaseModel):
     root_cause: float = 0.0
     parts_discipline: float = 0.0
@@ -55,6 +60,17 @@ class GradeBreakdown(BaseModel):
     true_mode: str
     wrong_parts_replaced: list[str] = Field(default_factory=list)
     details: list[str] = Field(default_factory=list)
+
+    def model_dump(self, **kwargs) -> dict:
+        """Score buckets serialize as 'value/max' (e.g. '60/60') so every
+        displayed breakdown carries its denominator. Attribute access stays
+        numeric for programmatic use."""
+        data = super().model_dump(**kwargs)
+        data["root_cause"] = _out_of(self.root_cause, ROOT_CAUSE_MAX)
+        data["parts_discipline"] = _out_of(self.parts_discipline, PARTS_DISCIPLINE_MAX)
+        data["cost_efficiency"] = _out_of(self.cost_efficiency, COST_EFFICIENCY_MAX)
+        data["total"] = _out_of(self.total, 100.0)
+        return data
 
 
 _MODE_ALIASES: dict[str, FailureMode] = {

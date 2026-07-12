@@ -130,6 +130,13 @@ def render_transcript(model_name: str, sample, variant: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _score_num(value) -> float:
+    """Bucket scores serialize as 'value/max' (older logs: bare floats)."""
+    if isinstance(value, str):
+        return float(value.split("/")[0])
+    return float(value or 0.0)
+
+
 def collect_rows(logs: list[EvalLog], variant: str) -> list[dict]:
     rows = []
     for log in logs:
@@ -147,10 +154,11 @@ def collect_rows(logs: list[EvalLog], variant: str) -> list[dict]:
                 "epoch": sample.epoch,
                 "variant": variant,
                 "total": score.value if score else 0.0,
-                "root": meta.get("root_cause", 0.0),
-                "parts": meta.get("parts_discipline", 0.0),
-                "cost": meta.get("cost_efficiency", 0.0),
-                "root_ok": meta.get("root_cause", 0.0) >= ROOT_CAUSE_MAX,
+                "root": _score_num(meta.get("root_cause", 0.0)),
+                "parts": _score_num(meta.get("parts_discipline", 0.0)),
+                "cost": _score_num(meta.get("cost_efficiency", 0.0)),
+                "root_ok": _score_num(meta.get("root_cause", 0.0))
+                >= ROOT_CAUSE_MAX,
                 "fix_verified": bool(meta.get("fix_verified", False)),
                 # Discipline behavior the coached prompt dictated: at least
                 # one diagnostic probe before the first replacement.
