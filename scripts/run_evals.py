@@ -51,12 +51,16 @@ MOCK_SCRIPTS: dict[str, list[tuple[str, dict]]] = {
         ("measure_voltage", {"point_a": "battery_positive",
                              "point_b": "battery_negative",
                              "engine_state": "key_on"}),
+        ("replace_part", {"component": "battery"}),
+        ("attempt_start", {}),
         ("finish", {"answer": "battery dead"}),
     ],
     "medium_corroded_ground": [
         ("measure_voltage", {"point_a": "battery_negative",
                              "point_b": "engine_block",
                              "engine_state": "cranking"}),
+        ("replace_part", {"component": "ground_strap"}),
+        ("attempt_start", {}),
         ("finish", {"answer": "ground_strap corroded"}),
     ],
     "medium_ground_red_herring_battery": [
@@ -66,6 +70,8 @@ MOCK_SCRIPTS: dict[str, list[tuple[str, dict]]] = {
         ("measure_voltage", {"point_a": "battery_negative",
                              "point_b": "engine_block",
                              "engine_state": "cranking"}),
+        ("replace_part", {"component": "ground_strap"}),
+        ("attempt_start", {}),
         ("finish", {"answer": "ground_strap corroded"}),
     ],
 }

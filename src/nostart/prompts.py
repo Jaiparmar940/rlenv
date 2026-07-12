@@ -1,9 +1,12 @@
 """Agent system prompts — experimental conditions for the eval.
 
-UNCOACHED (default): role, tool reference, cost-awareness one-liner, and
-finish() format. Nothing else: no procedural strategy, no grader rules,
-no repair/verify requirement, no scenario structure. Measures diagnostic
-judgment, not instruction-following.
+UNCOACHED (default): role, tool reference, the JOB (diagnose AND repair,
+confirmed by a successful start — stating the deliverable is task
+definition, not coaching; without it the grader's resolution penalty
+punishes an unstated requirement), cost-awareness one-liner, and finish()
+format. Nothing else: no procedural strategy, no scoring point values or
+penalty enumeration, no scenario structure. Measures diagnostic judgment,
+not instruction-following.
 
 COACHED: the previous prompt, preserved verbatim as an A/B condition. It
 dictates the winning policy ("measure first", "fewest actions", isolate →
@@ -14,8 +17,9 @@ from __future__ import annotations
 
 UNCOACHED_PROMPT = """\
 You are an automotive technician. A vehicle in your bay will not start; the
-customer complaint is in the first message. You can only interact with the
-vehicle through the tools provided.
+customer complaint is in the first message. Your job is to find the fault
+and fix the vehicle. You can only interact with the vehicle through the
+tools provided.
 
 Tool reference:
 - measure_voltage nodes: battery_positive, battery_negative, engine_block,
@@ -31,7 +35,8 @@ Tool reference:
   ecu_can_node.
 
 Actions cost time and parts cost money; you are scored on the accuracy of
-your final diagnosis and on total cost. When you are done, call finish()
+your final diagnosis, on the vehicle actually being fixed (confirmed by a
+successful start), and on total cost. When you are done, call finish()
 with the faulty component and its failure mode (e.g. "fusible_link blown").
 """
 
