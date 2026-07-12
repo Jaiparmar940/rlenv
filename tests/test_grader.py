@@ -140,6 +140,18 @@ class TestDiagnosisParsing:
         assert comp == Component.BATTERY
         assert mode == FailureMode.DEAD
 
+    def test_internal_short_sulfation_is_dead(self) -> None:
+        # claude-haiku-4-5 easy e1 uncoached (scored 30/60): word forms
+        # "internal short" and "sulfation" missed the first synonym pass.
+        text = (
+            "battery failed; internal short or sulfation caused critical "
+            "voltage loss preventing all electrical functions and engine "
+            "cranking"
+        )
+        comp, mode = parse_diagnosis(text)
+        assert comp == Component.BATTERY
+        assert mode == FailureMode.DEAD
+
     def test_internal_failure_shorted_cell_is_dead(self) -> None:
         # claude-sonnet-5 easy e2 (scored 30/60).
         text = (

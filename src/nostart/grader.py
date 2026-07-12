@@ -95,8 +95,11 @@ _MODE_SYNONYMS: dict[str, tuple[FailureMode, ...]] = {
     "internally_failed": (FailureMode.DEAD,),
     "internal_failure": (FailureMode.DEAD,),
     "internally_shorted": (FailureMode.DEAD,),
+    "internal_short": (FailureMode.DEAD,),
     "shorted_cell": (FailureMode.DEAD,),
-    "sulfated": (FailureMode.DEAD,),
+    # Substring match: "sulfat" covers sulfated / sulfation / sulfating
+    # ("battery failed; internal short or sulfation" — claude-haiku-4-5).
+    "sulfat": (FailureMode.DEAD,),
     "discharged": (FailureMode.DEAD,),
 }
 
