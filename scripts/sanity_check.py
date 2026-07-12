@@ -307,7 +307,7 @@ def check_running_charging(scenario: str) -> tuple[str, list[Failure]]:
             Failure(scenario, "running", "alternator is the source (alt ≥ batt)",
                     f"alt ≥ {batt:.2f} − {PAIR_TOL}", f"{alt:.2f}")
         )
-    pid = session.read_pid("alt_output_v")["value"]
+    pid = session.read_pid("alt_output_v", "running")["value"]
     if pid < CHARGING_MIN:
         fails.append(
             Failure(scenario, "running", "scan tool reflects running engine",

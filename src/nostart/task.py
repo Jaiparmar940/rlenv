@@ -76,18 +76,23 @@ def scan_dtcs() -> Tool:
 
 @tool
 def read_pid() -> Tool:
-    async def execute(pid: str) -> str:
-        """Read a live scan-tool parameter. Reflects the vehicle's current
-        state: engine running if it has been started, otherwise key_on
-        (engine off). The payload names the state it was read in.
+    async def execute(pid: str, engine_state: str) -> str:
+        """Read a live scan-tool parameter at an engine state.
 
         Args:
             pid: One of: battery_voltage, alt_output_v, rpm, can_status.
+            engine_state: Vehicle state during the read. One of: key_on,
+                cranking, running. The scan tool has no ECU communication
+                at key_off, and running is only available while the engine
+                is actually running (after a successful start attempt).
 
         Returns:
             JSON with {pid, value, unit, engine_state}.
         """
-        return _dump(_session().read_pid(pid))
+        try:
+            return _dump(_session().read_pid(pid, engine_state))
+        except ValueError as exc:
+            raise ToolError(str(exc)) from None
 
     return execute
 

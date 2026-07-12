@@ -27,8 +27,8 @@ class ToolSession:
     def scan_dtcs(self) -> list[dict[str, str]]:
         return self._world.scan_dtcs()
 
-    def read_pid(self, pid: str) -> dict[str, Any]:
-        return self._world.read_pid(pid)
+    def read_pid(self, pid: str, engine_state: str) -> dict[str, Any]:
+        return self._world.read_pid(pid, engine_state)
 
     def measure_voltage(
         self, point_a: str, point_b: str, engine_state: str

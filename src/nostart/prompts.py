@@ -29,7 +29,9 @@ Tool reference:
   is only measurable while the engine is actually running (a successful
   start); working on the car or measuring in another key state shuts
   the engine off.
-- read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status.
+- read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status; read
+  at an engine_state of key_on, cranking, or running (the scan tool
+  has no ECU communication at key_off).
 - components (visual_inspect / replace_part): battery, ground_strap,
   starter_relay, starter_motor, alternator, fusible_link, ignition_switch,
   ecu_can_node.
@@ -54,7 +56,9 @@ Reference for tool inputs:
   is only measurable while the engine is actually running (a successful
   start); working on the car or measuring in another key state shuts
   the engine off.
-- read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status.
+- read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status; read
+  at an engine_state of key_on, cranking, or running (the scan tool
+  has no ECU communication at key_off).
 - components (visual_inspect / replace_part): battery, ground_strap,
   starter_relay, starter_motor, alternator, fusible_link, ignition_switch,
   ecu_can_node.
