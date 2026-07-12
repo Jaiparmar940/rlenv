@@ -12,7 +12,7 @@ Outputs (under --out, default results/):
     logs/*.eval               raw Inspect logs
 
 Real-model runs need provider API keys in the environment
-(ANTHROPIC_API_KEY, OPENAI_API_KEY, ...).
+(ANTHROPIC_API_KEY, OPENAI_API_KEY, XAI_API_KEY for grok/..., ...).
 """
 
 from __future__ import annotations
