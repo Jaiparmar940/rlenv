@@ -157,9 +157,11 @@ def write_results(rows: list[dict], out_dir: Path) -> Path:
         "# no-start-env results",
         "",
         f"Generated {date.today().isoformat()} at commit `{_git_commit()}`.",
-        "Score 0–100: root cause 60 / parts discipline 25 / cost efficiency 15;"
-        " wrong parts −8 each (also debited from total); finishing with no"
-        " measurements caps at 40.",
+        "Score 0-100: root cause 60 / parts discipline 25 / cost efficiency 15"
+        " (time-only vs expert baseline, zero at 2x, negative beyond). Wrong"
+        " parts -8 each (also debited from total). -15 unless the root-cause"
+        " part was replaced and a successful start verified it. Replacing"
+        " before any measurement caps at 40.",
         "",
         "| model | scenario | epoch | total | root | parts | cost | guess cap"
         " | wrong parts | diagnosis |",
@@ -182,7 +184,9 @@ def write_results(rows: list[dict], out_dir: Path) -> Path:
     lines.append("")
 
     out = out_dir / "results.md"
-    out.write_text("\n".join(lines))
+    # Explicit utf-8: Windows defaults write_text to the locale code page
+    # (cp1252), which cannot encode model prose or the em-dashes above.
+    out.write_text("\n".join(lines), encoding="utf-8")
     return out
 
 
@@ -194,7 +198,9 @@ def write_transcripts(rows: list[dict], out_dir: Path) -> Path:
             f"{_sanitize(r['model'])}__{_sanitize(r['scenario'])}"
             f"__e{r['epoch']}.md"
         )
-        (tdir / fname).write_text(render_transcript(r["model"], r["sample"]))
+        (tdir / fname).write_text(
+            render_transcript(r["model"], r["sample"]), encoding="utf-8"
+        )
     return tdir
 
 
