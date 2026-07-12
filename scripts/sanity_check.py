@@ -252,10 +252,78 @@ def check_localization(scenario: str) -> tuple[str, list[Failure]]:
     return "localization", fails
 
 
+# Root-cause component per scenario, used to reach the running state.
+_ROOT_COMPONENT = {
+    "easy_dead_battery": "battery",
+    "medium_corroded_ground": "ground_strap",
+    "medium_ground_red_herring_battery": "ground_strap",
+}
+
+CHARGING_MIN = 13.8   # healthy charging floor at battery terminals
+CHARGING_MAX = 14.6   # regulator ceiling
+
+
+def check_running_charging(scenario: str) -> tuple[str, list[Failure]]:
+    """Post-repair, a healthy alternator must show charging voltage.
+
+    Guards the framed-alternator trap: a model that fixes the car and then
+    checks the charging system must see ~14 V, not engine-off readings.
+    Also asserts the running state is gated (unreachable pre-repair).
+    """
+    fails: list[Failure] = []
+
+    session = ToolSession(scenario)
+    try:
+        session.measure_voltage("battery_positive", "battery_negative", "running")
+        fails.append(
+            Failure(scenario, "running", "running gated before repair",
+                    "ValueError (engine not running)", "measurement returned")
+        )
+    except ValueError:
+        pass
+
+    session.replace_part(_ROOT_COMPONENT[scenario])
+    result = session.attempt_start()["result"]
+    if result != "starts":
+        fails.append(
+            Failure(scenario, "running", "engine starts after root repair",
+                    "starts", result)
+        )
+        return "running-charging", fails
+
+    batt = session.measure_voltage(
+        "battery_positive", "battery_negative", "running"
+    )["volts"]
+    alt = session.measure_voltage(
+        "alt_output", "battery_negative", "running"
+    )["volts"]
+    if not (CHARGING_MIN <= batt <= CHARGING_MAX):
+        fails.append(
+            Failure(scenario, "running", "battery sees charging voltage",
+                    f"{CHARGING_MIN}–{CHARGING_MAX}", f"{batt:.2f}")
+        )
+    if alt < batt - PAIR_TOL:
+        fails.append(
+            Failure(scenario, "running", "alternator is the source (alt ≥ batt)",
+                    f"alt ≥ {batt:.2f} − {PAIR_TOL}", f"{alt:.2f}")
+        )
+    pid = session.read_pid("alt_output_v")["value"]
+    if pid < CHARGING_MIN:
+        fails.append(
+            Failure(scenario, "running", "scan tool reflects running engine",
+                    f"alt_output_v ≥ {CHARGING_MIN}", f"{pid:.2f}")
+        )
+    return "running-charging", fails
+
+
 SCENARIO_CHECKS = {
-    "easy_dead_battery": [check_easy_dead_battery],
-    "medium_corroded_ground": [check_corroded_ground, check_localization],
-    "medium_ground_red_herring_battery": [check_red_herring, check_localization],
+    "easy_dead_battery": [check_easy_dead_battery, check_running_charging],
+    "medium_corroded_ground": [
+        check_corroded_ground, check_localization, check_running_charging,
+    ],
+    "medium_ground_red_herring_battery": [
+        check_red_herring, check_localization, check_running_charging,
+    ],
 }
 
 

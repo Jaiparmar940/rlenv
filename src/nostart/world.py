@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 from nostart.costs import cost_for_action
 from nostart.domain.components import Component, InjectedFault, merge_severity, normalize_component
 from nostart.domain.propagation import (
+    IDLE_RPM,
     VALID_NODES,
     CanStatus,
     CrankBehavior,
@@ -109,6 +110,11 @@ class World:
         # Grader combines this with root-component-replaced to require a
         # verified fix (resolution penalty otherwise).
         self._fix_verified = False
+        # The engine keeps running after a successful start until something
+        # implies shutting it off (working on the car, or measuring in a
+        # non-running key state). Gates the "running" engine_state and what
+        # the scan tool (read_pid) reflects.
+        self._engine_running = False
 
     # --- Ground truth accessors (tool layer only, never serialized) ---
 
@@ -214,7 +220,11 @@ class World:
         self._charge_action("read_pid")
         self._note_probe()
         key = pid.strip().lower()
-        symptoms = self._resolve(EngineState.KEY_ON)
+        # The scan tool is passive: it reflects the vehicle's CURRENT state.
+        # After a successful start the engine is running and PIDs show
+        # charging-system values, not key-on ones.
+        state = EngineState.RUNNING if self._engine_running else EngineState.KEY_ON
+        symptoms = self._resolve(state)
 
         if key == "battery_voltage":
             v = symptoms.potential_difference("battery_positive", "battery_negative")
@@ -229,7 +239,9 @@ class World:
             return {"pid": "alt_output_v", "value": self._noise_band(v, 0.08), "unit": "V"}
         if key == "rpm":
             rpm = 0.0
-            if symptoms.crank_behavior == CrankBehavior.SLOW_CRANK:
+            if self._engine_running:
+                rpm = IDLE_RPM
+            elif symptoms.crank_behavior == CrankBehavior.SLOW_CRANK:
                 rpm = 95.0  # TODO(VERIFY): slow crank RPM
             elif symptoms.crank_behavior in (
                 CrankBehavior.CRANK_NO_START,
@@ -269,6 +281,16 @@ class World:
             raise ValueError(
                 f"Unknown engine_state '{es_raw}'. Valid: {valid}"
             ) from None
+
+        if es == EngineState.RUNNING and not self._engine_running:
+            raise ValueError(
+                "Engine is not running. A successful attempt_start() is "
+                "required before measuring in the 'running' state."
+            )
+        if es != EngineState.RUNNING:
+            # Putting the key in any other position shuts a running engine
+            # off; it must be restarted before further running measurements.
+            self._engine_running = False
 
         symptoms = self._resolve(es)
         if not self._intermittent_manifests(
@@ -313,6 +335,7 @@ class World:
         self._charge_action("replace_part", component=comp.value)
         self._replaced_components.add(comp)
         self._fix_verified = False  # any new install must be re-verified
+        self._engine_running = False  # engine off to work on the car
         # Remove fault for this component (known-good part installed).
         self._active_faults = [f for f in self._active_faults if f.component != comp]
         return {"installed": True}
@@ -324,8 +347,10 @@ class World:
         symptoms = self._resolve(EngineState.CRANKING)
         if not self._intermittent_manifests(symptoms.intermittency, "attempt_start"):
             symptoms = resolve_symptoms([], EngineState.CRANKING)
-        if symptoms.crank_behavior == CrankBehavior.STARTS:
+        started = symptoms.crank_behavior == CrankBehavior.STARTS
+        if started:
             self._fix_verified = True
+        self._engine_running = started
         return {"result": symptoms.crank_behavior.value}
 
     def finish(self, diagnosis: str) -> EpisodeStatus:

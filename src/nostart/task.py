@@ -77,7 +77,8 @@ def scan_dtcs() -> Tool:
 @tool
 def read_pid() -> Tool:
     async def execute(pid: str) -> str:
-        """Read a live scan-tool parameter (key_on).
+        """Read a live scan-tool parameter. Reflects the vehicle's current
+        state: engine running if it has been started, otherwise key_on.
 
         Args:
             pid: One of: battery_voltage, alt_output_v, rpm, can_status.
@@ -101,7 +102,9 @@ def measure_voltage() -> Tool:
                 chassis.
             point_b: Black probe node. Same options as point_a.
             engine_state: Vehicle state during the measurement. One of:
-                key_off, key_on, cranking.
+                key_off, key_on, cranking, running. The running state is
+                only available while the engine is actually running (after
+                a successful start attempt).
 
         Returns:
             JSON with the reading in volts (meter noise about ±0.05 V).

@@ -26,6 +26,11 @@ class EngineState(str, Enum):
     KEY_OFF = "key_off"
     KEY_ON = "key_on"
     CRANKING = "cranking"
+    # Engine running after a successful start: the alternator is the source
+    # and the system sits at charging voltage. Only reachable through
+    # World state (attempt_start must return "starts" first) — resting
+    # invariants and red herrings do NOT apply here.
+    RUNNING = "running"
 
 
 class CrankBehavior(str, Enum):
@@ -99,7 +104,20 @@ NOMINAL_NODES: dict[EngineState, dict[str, float]] = {
         "alt_output": 9.5,         # TODO(VERIFY)
         "chassis": 0.0,
     },
+    # Alternator regulating at idle, modest charge current into the battery.
+    # alt_output is the SOURCE here, so it sits highest; battery terminals
+    # read charging voltage (typical healthy 13.8-14.6 V at idle).
+    EngineState.RUNNING: {
+        "battery_positive": 14.3,  # TODO(VERIFY): charging V at battery
+        "battery_negative": 0.0,
+        "engine_block": 0.0,       # TODO(VERIFY): charge return, healthy ~0
+        "starter_stud": 14.3,      # TODO(VERIFY): same rail, no starter draw
+        "alt_output": 14.4,        # TODO(VERIFY): regulator setpoint
+        "chassis": 0.0,
+    },
 }
+
+IDLE_RPM = 700.0  # TODO(VERIFY): warm idle speed
 
 NOMINAL_CRANK_BEHAVIOR = CrankBehavior.STARTS
 NOMINAL_CAN_STATUS = CanStatus.OK
@@ -251,11 +269,24 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
         effect.dtcs.append("P0615")
 
     elif c == Component.ALTERNATOR and m == FailureMode.DIODE_FAILURE:
-        effect.node_deltas["alt_output"] = -0.8  # TODO(VERIFY)
+        if engine_state == EngineState.RUNNING:
+            # Weak charging: whole rail sits low (~13.2 V) with AC ripple
+            # (ripple itself surfaces via the alt_output_v PID average).
+            _apply_to_positive_rail(effect, -1.2)  # TODO(VERIFY)
+        else:
+            effect.node_deltas["alt_output"] = -0.8  # TODO(VERIFY)
         effect.dtcs.append("P0622")
 
     elif c == Component.ALTERNATOR and m == FailureMode.NO_OUTPUT:
-        effect.node_overrides["alt_output"] = sev["output_v"]
+        if engine_state == EngineState.RUNNING:
+            # No charge: the system runs on the battery. The alt post is
+            # still tied to the rail through the charge cable, so it reads
+            # battery voltage — the tell is NO rise above resting, not 0 V.
+            effect.node_overrides["battery_positive"] = 12.4  # TODO(VERIFY)
+            effect.node_overrides["starter_stud"] = 12.35  # TODO(VERIFY)
+            effect.node_overrides["alt_output"] = 12.35  # TODO(VERIFY)
+        else:
+            effect.node_overrides["alt_output"] = sev["output_v"]
         effect.dtcs.append("P0622")
 
     elif c == Component.FUSIBLE_LINK and m == FailureMode.BLOWN:
@@ -402,7 +433,11 @@ def resolve_symptoms(
             )
             if _battery_voltage(nodes) >= resting_v:
                 nodes["battery_positive"] = nodes["battery_negative"] + resting_v - 0.1
-    else:
+    elif engine_state != EngineState.RUNNING:
+        # Resting states only (key_off / key_on). RUNNING gets neither rule:
+        # red herrings are RESTING-ONLY overrides (invariant 3), and with the
+        # alternator as source, alt_output legitimately exceeds
+        # battery_positive — resting monotonicity does not apply.
         if red_herring_readings:
             for node, val in red_herring_readings.items():
                 nodes[node] = val

@@ -28,7 +28,7 @@ NODES = [
     "battery_positive", "battery_negative", "engine_block",
     "starter_stud", "alt_output", "chassis",
 ]
-STATES = ["key_off", "key_on", "cranking"]
+STATES = ["key_off", "key_on", "cranking", "running"]
 PIDS = ["battery_voltage", "alt_output_v", "rpm", "can_status"]
 COMPONENTS = [
     "battery", "ground_strap", "starter_relay", "starter_motor",

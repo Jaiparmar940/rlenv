@@ -21,7 +21,10 @@ Tool reference:
 - measure_voltage nodes: battery_positive, battery_negative, engine_block,
   starter_stud, alt_output, chassis. starter_stud is the B+ terminal on the
   starter solenoid.
-- engine states: key_off, key_on, cranking.
+- engine states: key_off, key_on, cranking, running. The running state
+  is only measurable while the engine is actually running (a successful
+  start); working on the car or measuring in another key state shuts
+  the engine off.
 - read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status.
 - components (visual_inspect / replace_part): battery, ground_strap,
   starter_relay, starter_motor, alternator, fusible_link, ignition_switch,
@@ -42,7 +45,10 @@ Reference for tool inputs:
 - measure_voltage nodes: battery_positive, battery_negative, engine_block,
   starter_stud, alt_output, chassis. starter_stud is the B+ terminal on the
   starter solenoid.
-- engine states: key_off, key_on, cranking.
+- engine states: key_off, key_on, cranking, running. The running state
+  is only measurable while the engine is actually running (a successful
+  start); working on the car or measuring in another key state shuts
+  the engine off.
 - read_pid PIDs: battery_voltage, alt_output_v, rpm, can_status.
 - components (visual_inspect / replace_part): battery, ground_strap,
   starter_relay, starter_motor, alternator, fusible_link, ignition_switch,

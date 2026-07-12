@@ -180,6 +180,34 @@ Installing a known-good part removes that component's fault from `_active_faults
 
 ---
 
+## Running engine state (added 2026-07-12 — NEEDS SIGN-OFF)
+
+Added after an eval transcript showed a correct-thinking model framed for an alternator fault: it fixed the car, checked charging, and got engine-off voltages because no running state existed.
+
+**State machine:** `attempt_start` → `starts` sets the engine running. It stays running until something implies shutting it off: `replace_part` (wrenching on the car) or a `measure_voltage` in any non-running key state. Measuring in `running` while the engine is not running RAISES. `read_pid` is passive and reflects the current state (running values after a successful start, key_on otherwise); `rpm` reads idle ≈ 700 while running.
+
+**Nominal running potentials** (alternator regulating at idle, modest charge current; all `TODO(VERIFY)`):
+
+| Node | V | Rationale |
+| --- | --- | --- |
+| alt_output | 14.4 | regulator setpoint (source node while running) |
+| battery_positive | 14.3 | charging V at battery, small feed drop from alt |
+| starter_stud | 14.3 | same rail, no starter draw |
+| engine_block / chassis | 0.0 | healthy charge-return ground |
+
+Resting monotonicity and resting red herrings do **not** apply at running: the alternator is the source (`alt_output ≥ battery_positive` is correct), and a marginal-battery bait reads charging voltage while being charged (bait remains at key_off/key_on only).
+
+**Alternator faults while running** (only faults reachable in a running engine today; all `TODO(VERIFY)`):
+
+| Mode | Running effect | Tell |
+| --- | --- | --- |
+| no_output | whole rail on battery: battery_positive 12.4, alt_output 12.35 | no rise above resting; alt post ≈ battery (cable intact), NOT 0 V |
+| diode_failure | rail −1.2 → ~13.2, plus AC-ripple-depressed PID avg | charges, but low |
+
+All other fault modes prevent the engine from starting in the current scenario set, so their running-state values are unreachable (gated by the state machine, verified by `check_running_charging` in sanity_check.py).
+
+---
+
 
 
 ## Sign-off checklist
@@ -190,5 +218,6 @@ Installing a known-good part removes that component's fault from `_active_faults
 - [x] DTC assignments appropriate
 - [x] Red herring scenario misleads but is beatable with voltage drop test
 - [x] Part prices and action times reasonable
+- [ ] Running-state charging physics (2026-07-12 addition: nominal 14.3/14.4 V, alternator-fault behavior, state-machine gating) — **pending Jaivir**
 
 **Expert sign-off:** Jaivir Parmar **Date:** July 10 , 2026
