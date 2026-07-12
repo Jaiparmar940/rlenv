@@ -206,8 +206,8 @@ def _make_sample(scenario_id: str) -> Sample:
         id=scenario_id,
         input=(
             f"Customer complaint: {scenario.complaint}\n\n"
-            "Diagnose the root cause. Use your tools; finish() with the "
-            "faulty component and failure mode when confident."
+            "Diagnose the root cause and repair the vehicle. When it is "
+            "fixed, finish() with the faulty component and failure mode."
         ),
         target=f"{scenario.root_cause.component.value} "
         f"{scenario.root_cause.mode.value}",
