@@ -68,10 +68,10 @@ class TestChargingPhysics:
         # The exact trap: after a successful start, alt_output_v must show
         # charging voltage, and rpm must show idle — not key-on values.
         session = _started_easy_session()
-        alt = session.read_pid("alt_output_v", "running")
+        alt = session.read_pid("alt_output_v")
         assert alt["value"] >= 13.8
         assert alt["engine_state"] == "running"
-        rpm = session.read_pid("rpm", "running")
+        rpm = session.read_pid("rpm")
         assert 600 <= rpm["value"] <= 800
         assert rpm["engine_state"] == "running"
 
@@ -81,10 +81,10 @@ class TestChargingPhysics:
         # masquerade as a failed alternator at idle. Tach reads 0.
         session = ToolSession("easy_dead_battery")
         session.replace_part("battery")
-        alt = session.read_pid("alt_output_v", "key_on")
+        alt = session.read_pid("alt_output_v")
         assert alt["value"] <= 12.7
         assert alt["engine_state"] == "key_on"
-        rpm = session.read_pid("rpm", "key_on")
+        rpm = session.read_pid("rpm")
         assert rpm["value"] == 0.0
         assert rpm["engine_state"] == "key_on"
 

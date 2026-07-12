@@ -22,7 +22,7 @@ def _run_agent(scenario_id: str, steps: list[tuple[str, ...]]) -> GradeBreakdown
         if cmd == "scan_dtcs":
             session.scan_dtcs()
         elif cmd == "read_pid":
-            session.read_pid(args[0], args[1])
+            session.read_pid(args[0])
         elif cmd == "measure_voltage":
             session.measure_voltage(args[0], args[1], args[2])
         elif cmd == "visual_inspect":
@@ -273,10 +273,10 @@ class TestResolutionPenalty:
             "easy_dead_battery",
             [
                 ("attempt_start",),
-                ("read_pid", "battery_voltage", "key_on"),
-                ("read_pid", "alt_output_v", "key_on"),
-                ("read_pid", "rpm", "key_on"),
-                ("read_pid", "can_status", "key_on"),
+                ("read_pid", "battery_voltage"),
+                ("read_pid", "alt_output_v"),
+                ("read_pid", "rpm"),
+                ("read_pid", "can_status"),
                 ("measure_voltage", *batt, "cranking"),
                 ("measure_voltage", *batt, "key_off"),
                 ("measure_voltage", *batt, "key_on"),
@@ -285,7 +285,7 @@ class TestResolutionPenalty:
                 ("replace_part", "battery"),
                 ("scan_dtcs",),
                 ("attempt_start",),
-                ("read_pid", "can_status", "key_on"),
+                ("read_pid", "can_status"),
                 ("measure_voltage", *batt, "key_on"),
                 ("measure_voltage", *batt, "key_off"),
                 ("measure_voltage", "engine_block", "battery_negative", "key_off"),

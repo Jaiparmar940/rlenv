@@ -66,7 +66,7 @@ def handle_action(payload: dict) -> dict:
         if action == "scan_dtcs":
             result = session.scan_dtcs()
         elif action == "read_pid":
-            result = session.read_pid(args["pid"], args["engine_state"])
+            result = session.read_pid(args["pid"])
         elif action == "measure_voltage":
             result = session.measure_voltage(
                 args["point_a"], args["point_b"], args["engine_state"]
@@ -134,7 +134,7 @@ PAGE = """<!doctype html>
   <button onclick="act('attempt_start')">attempt_start</button>
   <br>
   <select id="pid"></select>
-  <button onclick="act('read_pid',{pid:val('pid'),engine_state:val('es')})">read_pid</button>
+  <button onclick="act('read_pid',{pid:val('pid')})">read_pid</button>
   <br>
   <select id="pa"></select> → <select id="pb"></select>
   <select id="es"></select>

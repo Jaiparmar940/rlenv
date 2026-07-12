@@ -216,42 +216,17 @@ class World:
         codes = symptoms.dtcs
         return [{"code": c, "description": dtc_description(c)} for c in codes]
 
-    # Scan-tool-readable states: the ECU is asleep at key_off.
-    _PID_STATES = (EngineState.KEY_ON, EngineState.CRANKING, EngineState.RUNNING)
-
-    def read_pid(self, pid: str, engine_state: str) -> dict[str, Any]:
-        """Scan-tool read at an explicit engine state (like measure_voltage).
-
-        Raises ValueError on a state the scan tool cannot read (key_off has
-        no ECU communication) or 'running' while the engine is not running.
-        Every payload names the state it was read in, so an engine-off
-        alt_output_v (rail voltage) cannot masquerade as a failed
-        alternator at idle.
-        """
+    def read_pid(self, pid: str) -> dict[str, Any]:
         self._charge_action("read_pid")
         self._note_probe()
         key = pid.strip().lower()
-
-        es_raw = engine_state.strip().lower()
-        try:
-            state: EngineState | None = EngineState(es_raw)
-        except ValueError:
-            state = None
-        if state not in self._PID_STATES:
-            valid = [s.value for s in self._PID_STATES]
-            raise ValueError(
-                f"Scan tool cannot read at engine_state '{es_raw}' "
-                f"(no ECU communication). Valid: {valid}"
-            )
-        if state == EngineState.RUNNING and not self._engine_running:
-            raise ValueError(
-                "Engine is not running. A successful attempt_start() is "
-                "required before reading PIDs in the 'running' state."
-            )
-        if state != EngineState.RUNNING:
-            # Any other key position shuts a running engine off.
-            self._engine_running = False
-
+        # The scan tool is passive: it reflects the vehicle's CURRENT state.
+        # After a successful start the engine is running and PIDs show
+        # charging-system values, not key-on ones. Every payload names the
+        # state it was read in — instrument metadata, so an engine-off
+        # alt_output_v (rail voltage) cannot masquerade as a failed
+        # alternator at idle.
+        state = EngineState.RUNNING if self._engine_running else EngineState.KEY_ON
         symptoms = self._resolve(state)
         es = state.value
 
@@ -269,20 +244,13 @@ class World:
             return {"pid": "alt_output_v", "value": self._noise_band(v, 0.08),
                     "unit": "V", "engine_state": es}
         if key == "rpm":
-            # Live tach: 0 at key_on (engine off), crank speed while
-            # cranking, idle while running.
-            rpm = 0.0
-            if state == EngineState.RUNNING:
-                rpm = IDLE_RPM
-            elif state == EngineState.CRANKING:
-                if symptoms.crank_behavior == CrankBehavior.SLOW_CRANK:
-                    rpm = 95.0  # TODO(VERIFY): slow crank RPM
-                elif symptoms.crank_behavior in (
-                    CrankBehavior.CRANK_NO_START,
-                    CrankBehavior.STARTS,
-                ):
-                    rpm = 180.0  # TODO(VERIFY): normal crank RPM
-            value = self._noise_band(rpm, 5.0) if rpm > 0 else 0.0
+            # A live tach read: 0 with the engine off, idle while running.
+            # (Crank speed is not observable here — attempt_start reports
+            # slow_crank directly, which carries the same information.)
+            if self._engine_running:
+                value = self._noise_band(IDLE_RPM, 5.0)
+            else:
+                value = 0.0
             return {"pid": "rpm", "value": value, "unit": "rpm", "engine_state": es}
         if key == "can_status":
             status = symptoms.can_status.value
