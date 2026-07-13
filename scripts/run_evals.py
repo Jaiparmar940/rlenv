@@ -114,13 +114,16 @@ def render_transcript(model_name: str, sample, variant: str) -> str:
             "---",
             "",
         ]
-    for message in sample.messages:
+    # Number every message (1-based) so a transcript reader can see at a
+    # glance how deep into the message_limit budget an episode ran — several
+    # correct hard-tier episodes have died at the cap mid-verification.
+    for msg_num, message in enumerate(sample.messages, start=1):
         role = message.role.upper()
         if role == "TOOL":
             fn = getattr(message, "function", None) or "tool"
-            lines.append(f"### TOOL RESULT ({fn})")
+            lines.append(f"### [{msg_num}] TOOL RESULT ({fn})")
         else:
-            lines.append(f"### {role}")
+            lines.append(f"### [{msg_num}] {role}")
         text = _msg_text(message)
         if text:
             lines += ["", text, ""]
