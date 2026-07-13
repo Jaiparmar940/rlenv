@@ -25,6 +25,12 @@ class ScenarioDef(BaseModel):
     seed: int
     complaint: str
     root_cause: InjectedFault
+    # Compound scenarios: a SECOND genuine fault, injected alongside the root
+    # cause. It is not a red herring — the part really is bad and really must
+    # be replaced. The grader treats the root cause as PRIMARY (full credit
+    # needs it) and this one as SECONDARY (partial credit), and does not count
+    # replacing it as a wrong part.
+    secondary_fault: InjectedFault | None = None
     # Full-resolution expert baseline: diagnose, replace the root-cause part,
     # and verify with a successful start. Derived from the costs.py model for
     # an explicit expert action sequence (documented per scenario below) —
@@ -99,6 +105,67 @@ SCENARIOS: dict[str, ScenarioDef] = {
         # cross-check under load to rule out the marginal-battery bait (3)
         # = 37 min, $25.
         expert_baseline_cost={"minutes": 37.0, "dollars": 25.0},
+    ),
+    # --- HARD TIER PREVIEW (branch hard-tier-preview) ---------------------
+    # Physics for both scenarios below is PENDING HUMAN SIGN-OFF; see
+    # PENDING_HUMAN_PHYSICS_SIGNOFF.md. Do not publish results from these.
+    "hard_intermittent_ecu_can": ScenarioDef(
+        id="hard_intermittent_ecu_can",
+        tier=ScenarioTier.HARD,
+        # Seed chosen (not tuned for score) so the deterministic manifestation
+        # sequence is a fair hard case rather than a coin-flip: crank #1
+        # cranks-no-start, crank #2 starts, cranks #3/#4 fail again, and the
+        # FIRST scan_dtcs comes back clean — a single clean reading must not
+        # exonerate the ECU. Sequences are printed in the signoff file.
+        seed=3035,
+        complaint=(
+            "Sometimes it cranks and cranks and just won't fire. Other times "
+            "it starts right up. Two shops found nothing wrong."
+        ),
+        root_cause=InjectedFault(
+            component=Component.ECU_CAN_NODE,
+            mode=FailureMode.INTERMITTENT,
+            severity={"manifest_probability": 0.35},  # TODO(VERIFY)
+        ),
+        # Expert path: 4x attempt_start (4) — the fault only shows on some
+        # cranks — + 2x scan_dtcs (4) + 2x read_pid can_status (2)
+        # + replace ecu_can_node (20, $450) + verify start (1) = 31 min, $450.
+        expert_baseline_cost={"minutes": 31.0, "dollars": 450.0},
+    ),
+    "hard_compound_battery_and_ground": ScenarioDef(
+        id="hard_compound_battery_and_ground",
+        tier=ScenarioTier.HARD,
+        seed=3002,
+        complaint=(
+            "Cranks slow and usually won't catch. Battery's a few years old "
+            "but it was fine last winter."
+        ),
+        # PRIMARY: the subtle fault. A tech who stops at the obvious bad
+        # battery leaves the car broken — so the ground strap is the root
+        # cause and the battery is the secondary.
+        root_cause=InjectedFault(
+            component=Component.GROUND_STRAP,
+            mode=FailureMode.CORRODED,
+            # Lower than the single-fault ground scenarios (1.1/1.2 Ω) on
+            # purpose: a weaker choke on cranking current keeps the battery's
+            # own load-test failure visible. See the signoff file.
+            severity={"added_resistance_ohms": 0.7},  # TODO(VERIFY)
+        ),
+        # SECONDARY: genuinely bad, not bait. 1.6 V below nominal on the whole
+        # rail => ~11.0 V resting (vs the red-herring battery's 11.8 V) and
+        # ~9.25 V cranking (vs the red herring's >= 11.3 V hold): it FAILS a
+        # load test, which is exactly what the red-herring battery does not do.
+        secondary_fault=InjectedFault(
+            component=Component.BATTERY,
+            mode=FailureMode.WEAK,
+            severity={"terminal_drop_v": 1.6},  # TODO(VERIFY)
+        ),
+        # Expert path: attempt_start (1) + 4 measurements (battery key_off,
+        # battery cranking, ground drop cranking, feed drop cranking; 12)
+        # + replace ground_strap (20, $25) + replace battery (20, $180)
+        # + verify start (1) = 54 min, $205. Neither repair alone starts the
+        # car, so the expert necessarily buys both parts.
+        expert_baseline_cost={"minutes": 54.0, "dollars": 205.0},
     ),
 }
 

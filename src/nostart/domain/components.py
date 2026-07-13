@@ -62,6 +62,12 @@ class InjectedFault(BaseModel):
 DEFAULT_SEVERITY: dict[tuple[Component, FailureMode], dict[str, float]] = {
     (Component.BATTERY, FailureMode.WEAK): {
         "cca_remaining_pct": 45.0,  # TODO(VERIFY): weak battery CCA %
+        # How far the whole positive rail sits below nominal, in EVERY state
+        # (low open-circuit voltage from a degraded battery). The nominal
+        # cranking sag then applies on top of it, so a weak battery cranks
+        # at (nominal crank − terminal_drop_v). Default preserves the
+        # historical hard-coded −0.6 V; hard-tier scenarios raise it.
+        "terminal_drop_v": 0.6,  # TODO(VERIFY): rail offset for a weak battery
     },
     (Component.BATTERY, FailureMode.DEAD): {
         "open_circuit_v": 2.1,  # TODO(VERIFY): terminal voltage when dead

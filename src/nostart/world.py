@@ -6,6 +6,7 @@ Ground-truth fault state is held in private fields and never included in
 
 from __future__ import annotations
 
+import hashlib
 import random
 from typing import Any
 
@@ -94,8 +95,22 @@ class World:
         self._scenario: ScenarioDef = get_scenario(scenario_id)
         self._rng = random.Random(self._scenario.seed)
         self._root_cause: InjectedFault = self._scenario.root_cause.model_copy(deep=True)
+        # Compound scenarios inject a second, genuinely-faulty component
+        # alongside the root cause (see ScenarioDef.secondary_fault).
+        self._secondary_fault: InjectedFault | None = (
+            self._scenario.secondary_fault.model_copy(deep=True)
+            if self._scenario.secondary_fault is not None
+            else None
+        )
         self._active_faults: list[InjectedFault] = [self._root_cause.model_copy(deep=True)]
+        if self._secondary_fault is not None:
+            self._active_faults.append(self._secondary_fault.model_copy(deep=True))
         self._replaced_components: set[Component] = set()
+        # Per-probe-kind counters for intermittent faults. Manifestation is a
+        # pure function of (scenario seed, probe kind, index) — see
+        # _intermittent_manifests — so the k-th crank always behaves the same
+        # way no matter what else the agent did in between.
+        self._intermittency_counters: dict[str, int] = {}
         self._cumulative_cost = CumulativeCost()
         self._finished = False
         self._diagnosis: str | None = None
@@ -121,6 +136,11 @@ class World:
     @property
     def root_cause(self) -> InjectedFault:
         return self._root_cause
+
+    @property
+    def secondary_fault(self) -> InjectedFault | None:
+        """The co-fault in a compound scenario (None otherwise)."""
+        return self._secondary_fault
 
     @property
     def active_faults(self) -> list[InjectedFault]:
@@ -187,9 +207,25 @@ class World:
         )
 
     def _intermittent_manifests(self, intermittency: float, probe_tag: str) -> bool:
+        """Does an intermittent fault show itself on THIS probe?
+
+        Deterministic by construction: the roll is a hash of
+        (scenario seed, probe kind, index-of-this-probe-kind) — no wall clock,
+        and deliberately NOT drawn from ``self._rng``, whose stream is also
+        consumed by meter noise and visual inspection. Two consequences that
+        the tests pin:
+
+          * identical runs produce identical observations, and
+          * the k-th ``attempt_start`` gives the same answer regardless of how
+            many other actions were interleaved before it.
+        """
         if intermittency >= 1.0:
             return True
-        roll = self._rng.random()
+        index = self._intermittency_counters.get(probe_tag, 0)
+        self._intermittency_counters[probe_tag] = index + 1
+        payload = f"{self._scenario.seed}|{probe_tag}|{index}".encode()
+        digest = hashlib.blake2b(payload, digest_size=8).digest()
+        roll = int.from_bytes(digest, "big") / 2**64
         return roll < intermittency
 
     def _noise_band(self, value: float, band: float) -> float:

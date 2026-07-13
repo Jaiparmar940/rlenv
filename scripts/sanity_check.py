@@ -23,6 +23,9 @@ SCENARIOS = (
     "easy_dead_battery",
     "medium_corroded_ground",
     "medium_ground_red_herring_battery",
+    # Hard-tier preview — physics PENDING HUMAN SIGN-OFF.
+    "hard_intermittent_ecu_can",
+    "hard_compound_battery_and_ground",
 )
 
 # Tolerances (volts).
@@ -32,6 +35,17 @@ MONO_EPS = 0.1      # resting monotonicity slack
 LARGE_DROP = 2.5    # a "large" ground-path drop under load
 FEED_SMALL = 0.5    # positive-feed drop must stay small for localization
 BATTERY_HOLDS = 11.3  # innocent battery floor under crank in ground-fault scenarios
+
+# --- Hard-tier thresholds (all TODO(VERIFY); see PENDING_HUMAN_PHYSICS_SIGNOFF.md) ---
+# A corroded strap milder than the single-fault scenarios (0.7 Ω vs 1.1/1.2 Ω)
+# still has to be unmistakable: a healthy ground drops < 0.2 V under crank.
+COMPOUND_GROUND_DROP = 1.5
+# A GENUINELY weak battery must fail a load test. Shop rule of thumb: a 12 V
+# battery holding < 9.6 V under cranking load is condemned.
+LOAD_TEST_FAIL = 9.6
+# ...and it must read clearly worse at rest than the innocent red-herring
+# battery (11.8 V), so the two are not confusable.
+COMPOUND_BATTERY_REST = 11.5
 
 
 class Failure:
@@ -252,11 +266,206 @@ def check_localization(scenario: str) -> tuple[str, list[Failure]]:
     return "localization", fails
 
 
-# Root-cause component per scenario, used to reach the running state.
-_ROOT_COMPONENT = {
-    "easy_dead_battery": "battery",
-    "medium_corroded_ground": "ground_strap",
-    "medium_ground_red_herring_battery": "ground_strap",
+def check_compound(scenario: str) -> tuple[str, list[Failure]]:
+    """Compound: a GENUINELY weak battery AND a corroded ground, together.
+
+    What a tech must see (and what these assertions pin):
+      1. Battery is really bad: ~11.0 V at rest (worse than the 11.8 V
+         red-herring bait) and it FAILS a load test — < 9.6 V cranking, far
+         below the 11.3 V an innocent battery holds in the ground scenarios.
+      2. Ground is really bad: >= 1.5 V dropped across the strap under crank
+         (a healthy strap drops < 0.2 V), and ~0 V at rest.
+      3. Still localizable: the positive feed stays clean, so the drop belongs
+         to the ground junction, not the supply side.
+      4. Neither repair alone fixes the car — replacing only the battery or
+         only the strap still slow-cranks; both are required to start.
+    """
+    fails: list[Failure] = []
+
+    for state in ("key_off", "key_on"):
+        batt = measure(scenario, "battery_positive", "battery_negative", state)
+        if batt > COMPOUND_BATTERY_REST:
+            fails.append(
+                Failure(scenario, state,
+                        "battery is genuinely weak at rest (worse than the "
+                        "11.8 V red-herring bait)",
+                        f"<= {COMPOUND_BATTERY_REST}", f"{batt:.2f}")
+            )
+        gnd = _abs_ground_drop(scenario, state)
+        if gnd > 0.2:
+            fails.append(
+                Failure(scenario, state, "ground drop ~0 at rest (load-only fault)",
+                        "|drop| <= 0.2", f"{gnd:.2f}")
+            )
+
+    batt_crank = measure(scenario, "battery_positive", "battery_negative", "cranking")
+    if batt_crank > LOAD_TEST_FAIL:
+        fails.append(
+            Failure(scenario, "cranking",
+                    "battery FAILS the load test (it is a real co-fault, not bait)",
+                    f"<= {LOAD_TEST_FAIL}", f"{batt_crank:.2f}")
+        )
+    if batt_crank >= BATTERY_HOLDS:
+        fails.append(
+            Failure(scenario, "cranking",
+                    "battery sags well below the innocent-battery floor",
+                    f"< {BATTERY_HOLDS}", f"{batt_crank:.2f}")
+        )
+
+    gnd_crank = _abs_ground_drop(scenario, "cranking")
+    feed_crank = abs(measure(scenario, "battery_positive", "starter_stud", "cranking"))
+    if gnd_crank < COMPOUND_GROUND_DROP:
+        fails.append(
+            Failure(scenario, "cranking",
+                    "ground-path drop present under load (the second tell)",
+                    f"|drop| >= {COMPOUND_GROUND_DROP}", f"{gnd_crank:.2f}")
+        )
+    if feed_crank > FEED_SMALL:
+        fails.append(
+            Failure(scenario, "cranking", "positive feed stays clean",
+                    f"|drop| <= {FEED_SMALL}", f"{feed_crank:.2f}")
+        )
+    if gnd_crank < feed_crank + 1.0:
+        fails.append(
+            Failure(scenario, "cranking", "ground fault localizable vs the feed",
+                    "ground >= feed + 1.0 V",
+                    f"ground={gnd_crank:.2f}, feed={feed_crank:.2f}")
+        )
+
+    # Neither repair alone resolves the car: both faults are real.
+    for partial in (["battery"], ["ground_strap"]):
+        session = ToolSession(scenario)
+        for component in partial:
+            session.replace_part(component)
+        result = session.attempt_start()["result"]
+        if result == "starts":
+            fails.append(
+                Failure(scenario, "cranking",
+                        f"replacing only {partial[0]} must NOT fix the car",
+                        "not 'starts'", result)
+            )
+    session = ToolSession(scenario)
+    session.replace_part("ground_strap")
+    session.replace_part("battery")
+    result = session.attempt_start()["result"]
+    if result != "starts":
+        fails.append(
+            Failure(scenario, "cranking", "both repairs together fix the car",
+                    "starts", result)
+        )
+
+    return "scenario:compound", fails
+
+
+def check_intermittent(scenario: str) -> tuple[str, list[Failure]]:
+    """Intermittent ECU/CAN node: present on only ~35% of probes.
+
+    What a tech must see (and what these assertions pin):
+      1. The car sometimes cranks-no-start and sometimes starts fine — the
+         complaint is real, but one good crank proves nothing.
+      2. A clean scan does NOT exonerate: some scans return no codes at all,
+         others return U0100. Same for the CAN status PID.
+      3. Nothing electrical moves: every voltage reads nominal in every state,
+         so a pure drop-test workflow cannot find this fault.
+      4. Manifestation is deterministic in the seed: identical runs produce
+         identical crank sequences (no wall-clock randomness).
+      5. Replacing the ECU node fixes it: 12 consecutive clean starts.
+    """
+    fails: list[Failure] = []
+
+    def crank_sequence(n: int) -> list[str]:
+        session = ToolSession(scenario)
+        return [session.attempt_start()["result"] for _ in range(n)]
+
+    seq = crank_sequence(20)
+    misfires = [r for r in seq if r != "starts"]
+    starts = [r for r in seq if r == "starts"]
+    if not misfires:
+        fails.append(
+            Failure(scenario, "cranking", "fault manifests on some cranks",
+                    ">= 1 non-start in 20", "0")
+        )
+    if not starts:
+        fails.append(
+            Failure(scenario, "cranking",
+                    "fault is INTERMITTENT (car also starts fine sometimes)",
+                    ">= 1 start in 20", "0")
+        )
+    if misfires and set(misfires) != {"crank_no_start"}:
+        fails.append(
+            Failure(scenario, "cranking", "misfire signature is crank_no_start",
+                    "{'crank_no_start'}", str(set(misfires)))
+        )
+    rate = len(misfires) / len(seq)
+    if not 0.15 <= rate <= 0.60:
+        fails.append(
+            Failure(scenario, "cranking",
+                    "manifest rate near the 0.35 severity parameter",
+                    "0.15-0.60 over 20 cranks", f"{rate:.2f}")
+        )
+
+    # Determinism: same seed, same sequence. No wall clock anywhere.
+    if crank_sequence(20) != seq:
+        fails.append(
+            Failure(scenario, "cranking", "identical runs -> identical observations",
+                    "same crank sequence", "sequences differ")
+        )
+
+    # A single clean reading must not exonerate the ECU.
+    session = ToolSession(scenario)
+    scans = [len(session.scan_dtcs()) for _ in range(10)]
+    if not (any(s == 0 for s in scans) and any(s > 0 for s in scans)):
+        fails.append(
+            Failure(scenario, "key_on",
+                    "scans are sometimes clean and sometimes show codes",
+                    "both empty and non-empty scans in 10",
+                    str(scans))
+        )
+    session = ToolSession(scenario)
+    can = [session.read_pid("can_status")["value"] for _ in range(10)]
+    if not (any(c == "ok" for c in can) and any(c != "ok" for c in can)):
+        fails.append(
+            Failure(scenario, "key_on", "CAN status PID is also intermittent",
+                    "both 'ok' and degraded readings in 10", str(can))
+        )
+
+    # No electrical signature: voltages are nominal everywhere.
+    nominal = {"key_off": 12.6, "key_on": 12.4, "cranking": 9.8}
+    for state, expected in nominal.items():
+        batt = measure(scenario, "battery_positive", "battery_negative", state)
+        if abs(batt - expected) > NOISE_TOL:
+            fails.append(
+                Failure(scenario, state, "battery reads NOMINAL (fault is not electrical)",
+                        f"~ {expected}", f"{batt:.2f}")
+            )
+        gnd = _abs_ground_drop(scenario, state)
+        if gnd > 0.2:
+            fails.append(
+                Failure(scenario, state, "ground path innocent",
+                        "|drop| <= 0.2", f"{gnd:.2f}")
+            )
+
+    # The repair actually works.
+    session = ToolSession(scenario)
+    session.replace_part("ecu_can_node")
+    after = [session.attempt_start()["result"] for _ in range(12)]
+    if set(after) != {"starts"}:
+        fails.append(
+            Failure(scenario, "cranking", "replacing the ECU node fixes it for good",
+                    "12/12 'starts'", str(sorted(set(after))))
+        )
+
+    return "scenario:intermittent", fails
+
+
+# Components that must be replaced to resolve each scenario, in order. Used to
+# reach the running state (a compound scenario needs BOTH repairs to start).
+_REPAIR_COMPONENTS = {
+    "easy_dead_battery": ["battery"],
+    "medium_corroded_ground": ["ground_strap"],
+    "medium_ground_red_herring_battery": ["ground_strap"],
+    "hard_intermittent_ecu_can": ["ecu_can_node"],
+    "hard_compound_battery_and_ground": ["ground_strap", "battery"],
 }
 
 CHARGING_MIN = 13.8   # healthy charging floor at battery terminals
@@ -282,7 +491,8 @@ def check_running_charging(scenario: str) -> tuple[str, list[Failure]]:
     except ValueError:
         pass
 
-    session.replace_part(_ROOT_COMPONENT[scenario])
+    for component in _REPAIR_COMPONENTS[scenario]:
+        session.replace_part(component)
     result = session.attempt_start()["result"]
     if result != "starts":
         fails.append(
@@ -324,6 +534,8 @@ SCENARIO_CHECKS = {
     "medium_ground_red_herring_battery": [
         check_red_herring, check_localization, check_running_charging,
     ],
+    "hard_intermittent_ecu_can": [check_intermittent, check_running_charging],
+    "hard_compound_battery_and_ground": [check_compound, check_running_charging],
 }
 
 

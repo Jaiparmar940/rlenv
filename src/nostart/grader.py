@@ -31,6 +31,20 @@ WRONG_PART_PENALTY = 8.0
 RESOLUTION_PENALTY = 15.0
 COMPONENT_ONLY_CREDIT = ROOT_CAUSE_MAX / 2.0
 
+# --- Compound (two genuine faults) scenarios ---
+# The 60-point root-cause budget SPLITS; it does not grow. Totals stay on the
+# same 0-100 scale as single-fault scenarios, and a tech who names both faults
+# earns exactly the 60 a correct single-fault answer earns.
+#   primary   (the root cause; scenario.root_cause)      -> 45
+#   secondary (the co-fault;   scenario.secondary_fault) -> 15
+# Each is scored like the single-fault bucket: full on component+mode, half on
+# component-only. Naming ONLY the secondary therefore caps root credit at
+# 15/60 — partial credit, never a pass. Replacing the secondary part is NOT a
+# wrong part: it really is bad, and a real tech who fixes both must not be
+# penalized for the second repair.
+PRIMARY_MAX = 45.0
+SECONDARY_MAX = 15.0
+
 # Cost efficiency is TIME-ONLY. Parts dollars are policed by parts discipline
 # (wrong parts) and are identical to the expert's for the correct repair, so
 # folding them into the cost ratio only dilutes wasted diagnostic time — a
@@ -47,6 +61,9 @@ def _out_of(value: float, maximum: float) -> str:
 
 
 class GradeBreakdown(BaseModel):
+    # root_cause is ALWAYS the full 60-point bucket. In a compound scenario it
+    # is the sum of primary_cause (/45) and secondary_cause (/15), so callers
+    # (and the pass^k metric) keep a single, comparable denominator.
     root_cause: float = 0.0
     parts_discipline: float = 0.0
     cost_efficiency: float = 0.0
@@ -58,6 +75,11 @@ class GradeBreakdown(BaseModel):
     diagnosed_mode: str | None = None
     true_component: str
     true_mode: str
+    # Compound scenarios only (None / 0.0 otherwise).
+    primary_cause: float = 0.0
+    secondary_cause: float = 0.0
+    true_secondary: str | None = None
+    diagnosed_secondary: bool = False
     wrong_parts_replaced: list[str] = Field(default_factory=list)
     details: list[str] = Field(default_factory=list)
 
@@ -70,6 +92,15 @@ class GradeBreakdown(BaseModel):
         data["parts_discipline"] = _out_of(self.parts_discipline, PARTS_DISCIPLINE_MAX)
         data["cost_efficiency"] = _out_of(self.cost_efficiency, COST_EFFICIENCY_MAX)
         data["total"] = _out_of(self.total, 100.0)
+        if self.true_secondary is None:
+            # Non-compound scenario: don't clutter the breakdown with buckets
+            # that cannot be earned.
+            data.pop("primary_cause", None)
+            data.pop("secondary_cause", None)
+            data.pop("diagnosed_secondary", None)
+        else:
+            data["primary_cause"] = _out_of(self.primary_cause, PRIMARY_MAX)
+            data["secondary_cause"] = _out_of(self.secondary_cause, SECONDARY_MAX)
         return data
 
 
@@ -180,8 +211,62 @@ def _shielded_spans(lowered: str) -> list[tuple[int, int]]:
     return spans
 
 
+_COMPONENT_ALIASES: dict[str, Component] = {
+    "bat": Component.BATTERY,
+    "ground": Component.GROUND_STRAP,
+    "relay": Component.STARTER_RELAY,
+    "starter": Component.STARTER_MOTOR,
+    "alternator": Component.ALTERNATOR,
+    "alt": Component.ALTERNATOR,
+    "fuse": Component.FUSIBLE_LINK,
+    "ignition": Component.IGNITION_SWITCH,
+    "ecu": Component.ECU_CAN_NODE,
+    "can": Component.ECU_CAN_NODE,
+}
+
+
+def component_mentions(text: str) -> dict[Component, int]:
+    """Every component named in the text → index of its earliest visible mention.
+
+    "Visible" excludes shielded spans (node names, X-to-Y compounds). Full
+    names take precedence; aliases only fill in components the full-name pass
+    did not find, so "ground strap" is not also counted as "ground".
+    """
+    lowered = text.strip().lower()
+    shields = _shielded_spans(lowered)
+
+    def visible(idx: int) -> bool:
+        return not any(start <= idx < end for start, end in shields)
+
+    found: dict[Component, int] = {}
+
+    def note(comp: Component, idx: int) -> None:
+        if idx >= 0 and (comp not in found or idx < found[comp]):
+            found[comp] = idx
+
+    for comp in Component:
+        for needle in (comp.value, comp.value.replace("_", " ")):
+            idx = lowered.find(needle)
+            while idx >= 0 and not visible(idx):
+                idx = lowered.find(needle, idx + 1)
+            note(comp, idx)
+
+    if not found:
+        for alias, comp in _COMPONENT_ALIASES.items():
+            for match in re.finditer(rf"\b{re.escape(alias)}\b", lowered):
+                if visible(match.start()):
+                    note(comp, match.start())
+                    break
+    return found
+
+
 def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | None]:
-    """Fuzzy-parse agent diagnosis into component + failure mode."""
+    """Fuzzy-parse agent diagnosis into component + failure mode.
+
+    EARLIEST visible mention wins: models lead with their diagnosis, and later
+    prose often mentions other components only to exonerate them ("...starves
+    the starter motor; battery is not the cause").
+    """
     if not text or not text.strip():
         return None, None
 
@@ -190,44 +275,9 @@ def parse_diagnosis(text: str | None) -> tuple[Component | None, FailureMode | N
 
     component: Component | None = normalize_component(raw)
     if component is None:
-        # EARLIEST full-name mention wins: models lead with their diagnosis,
-        # and later prose often mentions other components only to exonerate
-        # them ("...starves the starter motor; battery is not the cause").
-        shields = _shielded_spans(lowered)
-
-        def visible(idx: int) -> bool:
-            return not any(start <= idx < end for start, end in shields)
-
-        earliest: tuple[int, Component] | None = None
-        for comp in Component:
-            for needle in (comp.value, comp.value.replace("_", " ")):
-                idx = lowered.find(needle)
-                while idx >= 0 and not visible(idx):
-                    idx = lowered.find(needle, idx + 1)
-                if idx >= 0 and (earliest is None or idx < earliest[0]):
-                    earliest = (idx, comp)
-        if earliest is None:
-            aliases = {
-                "bat": Component.BATTERY,
-                "ground": Component.GROUND_STRAP,
-                "relay": Component.STARTER_RELAY,
-                "starter": Component.STARTER_MOTOR,
-                "alternator": Component.ALTERNATOR,
-                "alt": Component.ALTERNATOR,
-                "fuse": Component.FUSIBLE_LINK,
-                "ignition": Component.IGNITION_SWITCH,
-                "ecu": Component.ECU_CAN_NODE,
-                "can": Component.ECU_CAN_NODE,
-            }
-            for alias, comp in aliases.items():
-                for match in re.finditer(rf"\b{re.escape(alias)}\b", lowered):
-                    if not visible(match.start()):
-                        continue
-                    if earliest is None or match.start() < earliest[0]:
-                        earliest = (match.start(), comp)
-                    break
-        if earliest is not None:
-            component = earliest[1]
+        mentions = component_mentions(lowered)
+        if mentions:
+            component = min(mentions, key=lambda c: mentions[c])
 
     mode = parse_failure_mode(lowered, component)
     return component, mode
@@ -250,11 +300,44 @@ def score_root_cause(
     return COMPONENT_ONLY_CREDIT
 
 
+def score_fault_mention(
+    text: str,
+    true_component: Component,
+    true_mode: FailureMode,
+    maximum: float,
+) -> float:
+    """Credit for naming one fault ANYWHERE in the diagnosis text.
+
+    Used for compound scenarios, where a correct answer names two components
+    and earliest-mention parsing would score only whichever the model wrote
+    first. Mode is resolved against the component's own valid modes
+    (parse_failure_mode), and the two components in a compound scenario have
+    disjoint mode vocabularies, so the modes cannot cross-credit.
+
+    Known limitation (documented, not fixed): a diagnosis that mentions a
+    component only to EXONERATE it still counts as a mention here. In a
+    compound scenario both named components really are faulty, so exoneration
+    prose is simply a wrong answer.
+    """
+    if true_component not in component_mentions(text):
+        return 0.0
+    mode = parse_failure_mode(text.lower(), true_component)
+    return maximum if mode == true_mode else maximum / 2.0
+
+
 def score_parts_discipline(
     root_component: Component,
     replaced: set[Component],
+    *,
+    also_faulty: frozenset[Component] = frozenset(),
 ) -> tuple[float, list[str]]:
-    wrong = [c for c in sorted(replaced, key=lambda x: x.value) if c != root_component]
+    """Wrong parts = replaced components that were not actually faulty.
+
+    ``also_faulty`` holds a compound scenario's secondary component: it really
+    is bad, so replacing it is a correct repair, not a parts-cannon shot.
+    """
+    correct = {root_component} | set(also_faulty)
+    wrong = [c for c in sorted(replaced, key=lambda x: x.value) if c not in correct]
     penalty = len(wrong) * WRONG_PART_PENALTY
     points = max(0.0, PARTS_DISCIPLINE_MAX - penalty)
     return points, [c.value for c in wrong]
@@ -279,18 +362,38 @@ def grade(world: World) -> GradeBreakdown:
     """Score a finished (or in-progress) episode from ground truth."""
     scenario: ScenarioDef = world.scenario
     root = world.root_cause
+    secondary = world.secondary_fault
     snapshot = world.public_snapshot()
+    text = snapshot.diagnosis or ""
 
     diagnosed_component, diagnosed_mode = parse_diagnosis(snapshot.diagnosis)
-    root_pts = score_root_cause(
-        root.component,
-        root.mode,
-        diagnosed_component,
-        diagnosed_mode,
-    )
+
+    primary_pts = 0.0
+    secondary_pts = 0.0
+    if secondary is None:
+        root_pts = score_root_cause(
+            root.component,
+            root.mode,
+            diagnosed_component,
+            diagnosed_mode,
+        )
+    else:
+        # Compound: score each fault on its own mention, so an answer naming
+        # both in either order gets both. The 60-point budget splits 45/15.
+        primary_pts = score_fault_mention(
+            text, root.component, root.mode, PRIMARY_MAX
+        )
+        secondary_pts = score_fault_mention(
+            text, secondary.component, secondary.mode, SECONDARY_MAX
+        )
+        root_pts = primary_pts + secondary_pts
+
     parts_pts, wrong_parts = score_parts_discipline(
         root.component,
         world.replaced_components,
+        also_faulty=(
+            frozenset({secondary.component}) if secondary else frozenset()
+        ),
     )
     cost_pts = score_cost_efficiency(
         snapshot.cumulative_cost.minutes,
@@ -333,8 +436,17 @@ def grade(world: World) -> GradeBreakdown:
             f"No measurements before finish(); total capped at {GUESSING_CAP:.0f}."
         )
 
-    if diagnosed_component != root.component:
-        details.append("Root cause component mismatch (symptom masking ignored).")
+    if secondary is None:
+        if diagnosed_component != root.component:
+            details.append("Root cause component mismatch (symptom masking ignored).")
+    else:
+        if primary_pts == 0.0:
+            details.append(
+                "Primary (root cause) fault not named; full root-cause credit "
+                "is unreachable without it."
+            )
+        if secondary_pts == 0.0:
+            details.append("Secondary co-fault not named.")
 
     total = max(0.0, total)  # negative cost_pts must not push the total below 0
 
@@ -350,6 +462,14 @@ def grade(world: World) -> GradeBreakdown:
         diagnosed_mode=diagnosed_mode.value if diagnosed_mode else None,
         true_component=root.component.value,
         true_mode=root.mode.value,
+        primary_cause=primary_pts,
+        secondary_cause=secondary_pts,
+        true_secondary=(
+            f"{secondary.component.value} {secondary.mode.value}"
+            if secondary
+            else None
+        ),
+        diagnosed_secondary=secondary_pts > 0.0,
         wrong_parts_replaced=wrong_parts,
         details=details,
     )

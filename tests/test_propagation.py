@@ -179,8 +179,11 @@ class TestRestingMonotonicityAllScenarios:
         self, scenario_id: str, engine_state: EngineState
     ) -> None:
         scenario = get_scenario(scenario_id)
+        faults = [scenario.root_cause]
+        if scenario.secondary_fault is not None:
+            faults.append(scenario.secondary_fault)
         symptoms = resolve_symptoms(
-            [scenario.root_cause],
+            faults,
             engine_state,
             red_herring_readings=scenario.red_herring_voltages or None,
         )

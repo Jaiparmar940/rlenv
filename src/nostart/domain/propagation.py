@@ -212,7 +212,11 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
     c, m = fault.component, fault.mode
 
     if c == Component.BATTERY and m == FailureMode.WEAK:
-        _apply_to_positive_rail(effect, -0.6)  # TODO(VERIFY): weak terminal V
+        # A degraded battery sits low on the whole positive rail in every
+        # state (reduced open-circuit voltage); the nominal cranking sag then
+        # applies on top. Severity-driven so a scenario can dial "marginal"
+        # vs "genuinely weak" without touching this code path.
+        _apply_to_positive_rail(effect, -sev["terminal_drop_v"])
         if engine_state == EngineState.CRANKING:
             effect.crank_behavior = CrankBehavior.SLOW_CRANK
         effect.dtcs.extend(["P0562", "B1318"])
@@ -325,9 +329,19 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
             effect.crank_behavior = CrankBehavior.CRANK_NO_START
 
     elif c == Component.ECU_CAN_NODE and m == FailureMode.INTERMITTENT:
+        # A flaky ECU/CAN node drops off the bus only sometimes. When it DOES
+        # manifest on a given probe the engine cranks but never fires (no
+        # injection/spark command) — same crank signature as bus_off, but
+        # present on only ``manifest_probability`` of probes. Whether it
+        # manifests is decided in World (deterministic in seed + probe index);
+        # this effect describes what is seen WHEN it does. It moves no node
+        # potentials at all: a purely electrical drop-test workflow cannot
+        # find this fault.
         effect.can_status = CanStatus.DEGRADED
         effect.intermittency = sev["manifest_probability"]
         effect.dtcs.append("U0100")
+        if engine_state == EngineState.CRANKING:
+            effect.crank_behavior = CrankBehavior.CRANK_NO_START
 
     return effect
 
