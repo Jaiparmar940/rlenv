@@ -1,9 +1,9 @@
 # Leak + integrity audit
 
-- Date: 2026-07-13. Supersedes the 2026-07-12 audit of the retired 45-transcript corpus (same method; that corpus predated the series-consistency physics recalibration and the hard tier).
-- Commit: `8debf0e` (branch `main`) — includes the series-derived `GROUND_CURRENT_RECOVERY` (0.222), the merged hard tier, and the `low_capacity` grader vocabulary entry.
+- Date: 2026-07-13 (re-run after the corpus grew to k=5). Supersedes the 2026-07-12 audit of the retired 45-transcript corpus (same method; that corpus predated the series-consistency physics recalibration and the hard tier).
+- Commits: episodes produced at `8debf0e`–`bcbabea` (branch `main`). No `src/` (environment, grader, prompt) change exists between those commits — the only differences are scripts/report files — so all 225 episodes ran identical environment code: series-derived `GROUND_CURRENT_RECOVERY` (0.222), merged hard tier, `low_capacity` grader vocabulary.
 - Interpreter: `.venv/Scripts/python.exe`
-- Corpus: `results/transcripts/*.md` — **135 files (9 models x 5 scenarios x 3 epochs)**. All `prompt-variant: uncoached`. Produced by three invocations on 2026-07-13 at this single commit (two model-id casualties forced re-invocation: `gemini-2.5-flash` is use-blocked for new API keys, `qwen-2.5-3b` was delisted from OpenRouter, `llama-3.2-3b` has no tool-capable OpenRouter endpoint). Same commit, same prompt, same physics, same grader across all three invocations; the merged table and this corpus are one comparison. Dead logs were deleted; `results/logs/` holds exactly the nine `.eval` logs behind the table.
+- Corpus: `results/transcripts/*.md` — **225 files (9 models x 5 scenarios x 5 epochs)**. All `prompt-variant: uncoached`. Epochs 1-3 were run first; epochs 4-5 were added in a second pass and relabeled from a separate invocation (llama-8b's first +2-epoch attempt hit transient provider `CancelledError`s and was fully replaced by a clean retry — no partially-errored log contributes rows). Along the way three model ids were casualties, none of them scoring: `gemini-2.5-flash` is use-blocked for new API keys, `qwen-2.5-3b` was delisted from OpenRouter, `llama-3.2-3b` has no tool-capable OpenRouter endpoint. Dead logs were deleted; `results/logs/` holds exactly the eighteen `.eval` logs (9 models x 2 passes) behind the table.
 - Scope: read-only audit. No grader / world / scenario / prompt source was modified.
 
 | # | Item | Verdict |
@@ -29,33 +29,33 @@ Patterns searched (case-insensitive, word-boundary): all 16 `FailureMode` enum v
 
 ### Result on the leak surface
 
-Every hit across all 135 transcripts, exhaustively classified:
+Every hit across all 225 transcripts, exhaustively classified:
 
 | n | Section | Match | Classification |
 |---|---------|-------|----------------|
-| 135 | `SYSTEM` | `blown` | **Designed.** The `finish()` format example `(e.g. "fusible_link blown")`. `fusible_link blown` is not the root cause of any of the five scenarios; appears once per transcript. |
-| 135 | `USER` | `root cause` | **Designed.** The task instruction *"Diagnose the root cause and repair the vehicle."* Task definition, identical in every episode; carries no per-scenario signal. |
-| 27 | `USER` | `weak` | **Designed bait.** The red-herring complaint *"Shop said my battery is 'a little weak'"* (all `medium_ground_red_herring_battery` episodes). This is the trap the scenario exists to set. |
-| 22 | `TOOL RESULT (visual_inspect)` | `corroded` / `sulfation` | **Designed.** Dead-battery visual: *"Terminals corroded; slight sulfation odor."* A physical observation; does not name the true mode (`dead`). |
-| 21 | `TOOL RESULT (visual_inspect)` | `corrosion` | **Designed.** Weak/aged-battery visual: *"Terminal corrosion light; case looks aged."* Same class. |
-| 95 | `TOOL RESULT (finish)` | various | **Agent echo.** The agent's own diagnosis text reflected back verbatim at episode end. |
+| 225 | `SYSTEM` | `blown` | **Designed.** The `finish()` format example `(e.g. "fusible_link blown")`. `fusible_link blown` is not the root cause of any of the five scenarios; appears once per transcript. |
+| 225 | `USER` | `root cause` | **Designed.** The task instruction *"Diagnose the root cause and repair the vehicle."* Task definition, identical in every episode; carries no per-scenario signal. |
+| 45 | `USER` | `weak` | **Designed bait.** The red-herring complaint *"Shop said my battery is 'a little weak'"* (all `medium_ground_red_herring_battery` episodes). This is the trap the scenario exists to set. |
+| 36 | `TOOL RESULT (visual_inspect)` | `corroded` / `sulfation` | **Designed.** Dead-battery visual: *"Terminals corroded; slight sulfation odor."* A physical observation; does not name the true mode (`dead`). |
+| 35 | `TOOL RESULT (visual_inspect)` | `corrosion` | **Designed.** Weak/aged-battery visual: *"Terminal corrosion light; case looks aged."* Same class. |
+| 155 | `TOOL RESULT (finish)` | various | **Agent echo.** The agent's own diagnosis text reflected back verbatim at episode end. |
 | 0 | — | anything else | **No unexplained hits.** Attribution by tool function confirms zero banned-vocabulary hits in any non-`finish` tool result beyond the two designed visual strings above. |
 
 Notable negatives, checked explicitly on this corpus:
 
-- The corroded-ground-strap visual emits *"Strap end greenish; could be overlooked."* / *"Strap looks normal at a glance."* — never the string `corroded`, in any of the 54 ground/compound episodes.
+- The corroded-ground-strap visual emits *"Strap end greenish; could be overlooked."* / *"Strap looks normal at a glance."* — never the string `corroded`, in any of the 90 ground/compound episodes.
 - The hard-tier surfaces are clean: `can_status` reads return only `ok` / `degraded` values, intermittent cranks return only the standard `crank_no_start` / `starts` strings, and no compound-scenario tool output names either fault. Zero hits.
 - No tool result contains a component health verdict, fault name, or explanation — instrument readings only.
 
-**Verdict: PASS.** Zero ground-truth leakage in agent-visible, environment-authored text across all 135 transcripts.
+**Verdict: PASS.** Zero ground-truth leakage in agent-visible, environment-authored text across all 225 transcripts.
 
 ---
 
 ## Item 2 — AGENT SYSTEM PROMPT: **PASS**
 
-The sha256 of the `### SYSTEM` section is **identical across all 135 transcripts** (one distinct hash: `d907615d10d4…`), and matches `PROMPTS["uncoached"]` in `src/nostart/prompts.py` at this commit — the same prompt text audited verbatim in the 2026-07-12 audit (role, tool reference, job definition, cost one-liner, finish format only; no strategy, no grader rules, no trap or topology hints; the `finish()` example names a fault that is no scenario's root cause). The prompt is unchanged since commit `76b88f6`.
+The sha256 of the `### SYSTEM` section is **identical across all 225 transcripts** (one distinct hash: `d907615d10d4…`), and matches `PROMPTS["uncoached"]` in `src/nostart/prompts.py` at this commit — the same prompt text audited verbatim in the 2026-07-12 audit (role, tool reference, job definition, cost one-liner, finish format only; no strategy, no grader rules, no trap or topology hints; the `finish()` example names a fault that is no scenario's root cause). The prompt is unchanged since commit `76b88f6`.
 
-The single-revision provenance problem that invalidated the first published table (36 frontier transcripts under an older prompt than haiku's 9) does not recur here: one hash, 135 files.
+The single-revision provenance problem that invalidated the first published table (36 frontier transcripts under an older prompt than haiku's 9) does not recur here: one hash, 225 files.
 
 **Verdict: PASS.**
 
