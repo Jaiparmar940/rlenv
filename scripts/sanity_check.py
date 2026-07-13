@@ -34,7 +34,11 @@ PAIR_TOL = 0.12     # comparing two independent noisy readings (2 noise draws)
 MONO_EPS = 0.1      # resting monotonicity slack
 LARGE_DROP = 2.5    # a "large" ground-path drop under load
 FEED_SMALL = 0.5    # positive-feed drop must stay small for localization
-BATTERY_HOLDS = 11.3  # innocent battery floor under crank in ground-fault scenarios
+# Innocent battery floor under crank in ground-fault scenarios. Derived from
+# the series-consistent recovery (recovery/drop = sag/OCV = 2.8/12.6): the
+# 1.1/1.2 Ω scenarios put the battery at ~10.41/10.47 V cranking — well above
+# the 9.6 V load-test condemnation line, so the battery still reads innocent.
+BATTERY_HOLDS = 10.3
 
 # --- Hard-tier thresholds (all TODO(VERIFY); see PENDING_HUMAN_PHYSICS_SIGNOFF.md) ---
 # A corroded strap milder than the single-fault scenarios (0.7 Ω vs 1.1/1.2 Ω)
@@ -272,7 +276,7 @@ def check_compound(scenario: str) -> tuple[str, list[Failure]]:
     What a tech must see (and what these assertions pin):
       1. Battery is really bad: ~11.0 V at rest (worse than the 11.8 V
          red-herring bait) and it FAILS a load test — < 9.6 V cranking, far
-         below the 11.3 V an innocent battery holds in the ground scenarios.
+         below the ~10.4 V an innocent battery holds in the ground scenarios.
       2. Ground is really bad: >= 1.5 V dropped across the strap under crank
          (a healthy strap drops < 0.2 V), and ~0 V at rest.
       3. Still localizable: the positive feed stays clean, so the drop belongs

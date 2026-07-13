@@ -128,11 +128,20 @@ GROUND_DROP_CAP = 4.0              # max modeled ground-path drop (V)
 GROUND_REST_RISE = 0.03            # tiny engine_block rise at key_on for corroded ground
 # A series ground resistance limits current, so the battery sags LESS than a
 # healthy full-current crank. This fraction of the ground drop is "recovered"
-# at the battery terminals. Derivation: healthy crank ~180 A sags the battery
-# 12.6→9.8 V (internal R ≈ 15.6 mΩ). A ground fault choking current to ~half
-# recovers ΔI×R_int ≈ 90×0.0156 ≈ 1.4 V against a ~2.5 V ground drop → ~0.6.
-# Keeps the battery ≥ ~11.3 V under crank in ground-fault scenarios (innocent).
-GROUND_CURRENT_RECOVERY = 0.6  # TODO(VERIFY)
+# at the battery terminals. DERIVED, not tuned: in a linear series circuit
+# with battery internal resistance R_int and total healthy crank-circuit
+# resistance R_tot, an added strap resistance R_g gives
+#   recovery = R_int·(I0 − I) = R_int·V·R_g / (R_tot·(R_tot + R_g))
+#   drop     = I·R_g          =       V·R_g / (R_tot + R_g)
+# so recovery/drop = R_int/R_tot exactly, for ANY strap resistance — and
+# R_int/R_tot = (I0·R_int)/(I0·R_tot) = healthy_sag/OCV, needing no current
+# assumption. With OCV 12.6 V and healthy crank terminal 9.8 V this is
+# 2.8/12.6 ≈ 0.222. (The former hand-tuned 0.6 gave 11.45 V at the battery in
+# medium_corroded_ground where the series solve gives 10.41 V; ruled series-
+# consistent by Jaivir 2026-07-12 — see PENDING_HUMAN_PHYSICS_SIGNOFF.md §4.)
+_HEALTHY_OCV = NOMINAL_NODES[EngineState.KEY_OFF]["battery_positive"]
+_HEALTHY_CRANK_V = NOMINAL_NODES[EngineState.CRANKING]["battery_positive"]
+GROUND_CURRENT_RECOVERY = (_HEALTHY_OCV - _HEALTHY_CRANK_V) / _HEALTHY_OCV
 POS_CABLE_DROP_PER_OHM = 1.8       # V of positive-cable drop per added ohm, under crank
 POS_CABLE_DROP_CAP = 5.0
 BROKEN_GROUND_ACROSS = 0.2         # residual V across starter with an open ground

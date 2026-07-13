@@ -1,6 +1,19 @@
-# PENDING HUMAN PHYSICS SIGN-OFF — hard-tier preview
+# RESOLVED 2026-07-12 — hard-tier physics sign-off (kept as a record)
 
-**Branch:** `hard-tier-preview`. **Status: DO NOT MERGE. DO NOT PUBLISH RESULTS FROM THESE SCENARIOS.**
+**Status: RESOLVED.** Jaivir cleared every checkbox in §7 on 2026-07-12 and the branch was
+merged to main. On §4 he ruled: **the model must be consistent with the series solve** — in
+BOTH the hard tier and the already-published v0.1 scenarios. `GROUND_CURRENT_RECOVERY` is now
+derived (recovery/drop = healthy_sag/OCV = 2.8/12.6 ≈ 0.222; see `propagation.py`), which moved
+the innocent-battery cranking hold from ~11.45/11.6 V to ~10.41/10.47 V and the compound weak
+battery from ~9.22 V to ~8.59 V cranking (all tells preserved: innocents still pass the 9.6 V
+load test, the compound battery still fails it). Numbers quoted in the body below predate that
+recalibration — they are the record of what was reviewed, not the current model output.
+
+---
+
+# ORIGINAL FILE (pre-resolution) follows
+
+**Branch:** `hard-tier-preview`. **Status (at time of writing): DO NOT MERGE.**
 Nothing here is verified by play. Every number below is what the resistance-network model
 *computes*; none of it is hand-authored, and none of it is confirmed by a human who has
 touched a car.
@@ -277,22 +290,24 @@ Per-episode:
 
 ---
 
-## 7. What I need from you, concretely
+## 7. What I need from you, concretely — ALL CLEARED 2026-07-12
 
-- [ ] **Play `hard_compound_battery_and_ground`.** Is an 11.0 V resting battery that still
-      slow-cranks at 9.2 V a believable car? (Biggest single doubt.)
-- [ ] Is a 1.78 V drop across a ground strap under crank enough to characterize, given you
-      previously caught a "drop too small to characterize" bug?
-- [ ] Ratify or overrule the **0.7 Ω** strap choice (§3) — milder ground so the weak battery
-      stays visible, vs. keeping 1.1 Ω and making the battery much deader.
-- [ ] **Rule on §4** (`GROUND_CURRENT_RECOVERY` vs a series solve). This one affects the
-      **already-signed-off** scenarios, not just mine.
-- [ ] **Play `hard_intermittent_ecu_can`.** Is `crank_no_start` the right manifestation for a
-      flaky CAN node? Is 0.35 the right rate?
-- [ ] Ratify or overrule the **45/15 compound split** and the mention-based (not
-      earliest-mention) parsing for compound answers (§5).
-- [ ] Decide whether the intermittent scenario is discriminating or merely brutal (§6).
+- [x] **Play `hard_compound_battery_and_ground`.** Is an 11.0 V resting battery that still
+      slow-cranks at 9.2 V a believable car? (Biggest single doubt.) — SIGNED OFF. (Post-§4
+      recalibration the cranking figure is ~8.59 V; still fails the load test, resting 11.0 V
+      unchanged.)
+- [x] Is a 1.78 V drop across a ground strap under crank enough to characterize, given you
+      previously caught a "drop too small to characterize" bug? — SIGNED OFF.
+- [x] Ratify or overrule the **0.7 Ω** strap choice (§3) — RATIFIED.
+- [x] **Rule on §4** (`GROUND_CURRENT_RECOVERY` vs a series solve) — RULED: series-consistent,
+      in both the hard tier and the v0.1 scenarios. Recovery is now derived (≈ 0.222);
+      `BATTERY_HOLDS` floor moved 11.3 → 10.3; DOMAIN_TRUTH.md and CLAUDE.md invariant 5
+      updated. The published results table predates this recalibration and needs a rerun.
+- [x] **Play `hard_intermittent_ecu_can`.** Is `crank_no_start` the right manifestation for a
+      flaky CAN node? Is 0.35 the right rate? — SIGNED OFF as-is.
+- [x] Ratify or overrule the **45/15 compound split** and the mention-based parsing — RATIFIED.
+- [x] Decide whether the intermittent scenario is discriminating or merely brutal (§6) —
+      ACCEPTED as designed.
 
-**Until every box above is checked: do not merge, and do not let these two scenarios into any
-published results table.** `DOMAIN_TRUTH.md` has deliberately **not** been updated — I did not
-want hard-tier physics sitting in a document whose sign-off block says you approved it.
+All boxes cleared; branch merged to main 2026-07-12. `DOMAIN_TRUTH.md` now carries the
+hard-tier physics and the series-consistency ruling.

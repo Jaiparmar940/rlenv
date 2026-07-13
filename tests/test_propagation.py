@@ -82,8 +82,10 @@ class TestCorrodedGround:
             assert _ground_drop(self._symptoms(state)) <= 0.1
 
     def test_battery_holds_under_crank(self) -> None:
-        # Reduced cranking current: the battery is innocent and reads strong.
-        assert _battery_v(self._symptoms(EngineState.CRANKING)) >= 11.3
+        # Reduced cranking current: the battery is innocent. Series-consistent
+        # recovery puts it at ~10.41 V — above the 9.6 V load-test line.
+        assert _battery_v(self._symptoms(EngineState.CRANKING)) >= 10.4
+        assert _battery_v(self._symptoms(EngineState.CRANKING)) > 9.6
 
     def test_positive_feed_stays_small_under_crank(self) -> None:
         assert _feed_drop(self._symptoms(EngineState.CRANKING)) <= 0.5
@@ -138,8 +140,10 @@ class TestRedHerringScenarioCalibration:
             assert abs(batt - stud) <= 0.3
 
     def test_innocent_battery_holds_under_crank(self) -> None:
-        # Bait, not a co-fault: reads ~11.8 at rest, holds >= ~11.3 cranking.
-        assert _battery_v(self._symptoms(EngineState.CRANKING)) >= 11.3
+        # Bait, not a co-fault: reads ~11.8 at rest, holds ~10.47 cranking —
+        # a passing load test (> 9.6 V), so the battery is still innocent.
+        assert _battery_v(self._symptoms(EngineState.CRANKING)) >= 10.4
+        assert _battery_v(self._symptoms(EngineState.CRANKING)) > 9.6
 
     def test_ground_drop_is_the_tell_under_crank_only(self) -> None:
         assert _ground_drop(self._symptoms(EngineState.CRANKING)) >= 2.5

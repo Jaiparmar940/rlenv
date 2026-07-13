@@ -167,11 +167,11 @@ class TestCompoundPhysics:
 
     def test_battery_fails_the_load_test(self) -> None:
         # < 9.6 V cranking = condemned. The innocent battery in the ground
-        # scenarios holds >= 11.3 V; this one does not come close.
+        # scenarios holds ~10.4 V; this one does not come close.
         cranking = self._battery(EngineState.CRANKING)
-        assert cranking == pytest.approx(9.25, abs=0.05)
+        assert cranking == pytest.approx(8.59, abs=0.05)
         assert cranking < 9.6
-        assert cranking < 11.3
+        assert cranking < 10.4
 
     def test_load_sag_never_inverted(self) -> None:
         assert self._battery(EngineState.CRANKING) < self._battery(EngineState.KEY_ON)
@@ -255,7 +255,7 @@ class TestCompoundGrading:
             + [
                 (
                     "finish",
-                    "Weak battery (11.0 V resting, 9.2 V cranking) AND a "
+                    "Weak battery (11.0 V resting, 8.6 V cranking) AND a "
                     "corroded engine ground strap dropping 1.8 V under crank. "
                     "Both replaced.",
                 )

@@ -153,7 +153,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         ),
         # SECONDARY: genuinely bad, not bait. 1.6 V below nominal on the whole
         # rail => ~11.0 V resting (vs the red-herring battery's 11.8 V) and
-        # ~9.25 V cranking (vs the red herring's >= 11.3 V hold): it FAILS a
+        # ~8.59 V cranking (vs the red herring's ~10.47 V hold): it FAILS a
         # load test, which is exactly what the red-herring battery does not do.
         secondary_fault=InjectedFault(
             component=Component.BATTERY,
