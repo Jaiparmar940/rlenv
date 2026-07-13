@@ -148,6 +148,13 @@ _MODE_SYNONYMS: dict[str, tuple[FailureMode, ...]] = {
     # ("battery failed; internal short or sulfation" — claude-haiku-4-5).
     "sulfat": (FailureMode.DEAD,),
     "discharged": (FailureMode.DEAD,),
+    # "aged battery with low capacity" — claude-haiku-4-5 hard_compound e2
+    # (2026-07-12 hard-tier run): correct weak-battery secondary scored
+    # component-only (7.5/15). "Low capacity" cannot mean dead (a dead
+    # battery reads ~2 V, not ~11 V). Bare "failed" is deliberately NOT
+    # mapped: it does not disambiguate weak from dead and would credit
+    # vague answers.
+    "low_capacity": (FailureMode.WEAK,),
 }
 
 

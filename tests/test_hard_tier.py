@@ -1,8 +1,9 @@
-"""Hard-tier preview: intermittent ECU fault + compound (two-fault) scenario.
+"""Hard tier: intermittent ECU fault + compound (two-fault) scenario.
 
-Physics numbers asserted here are PENDING HUMAN SIGN-OFF
-(see PENDING_HUMAN_PHYSICS_SIGNOFF.md). They pin what the resistance-network
-model currently PRODUCES, so a silent change to the model cannot slip past.
+Physics numbers asserted here were signed off by Jaivir 2026-07-12
+(see PENDING_HUMAN_PHYSICS_SIGNOFF.md, resolved). They pin what the
+resistance-network model currently PRODUCES, so a silent change to the
+model cannot slip past.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from nostart.grader import (
     SECONDARY_MAX,
     GradeBreakdown,
     grade,
+    score_fault_mention,
 )
 from nostart.tools import ToolSession
 
@@ -264,6 +266,31 @@ class TestCompoundGrading:
         assert result.primary_cause == PRIMARY_MAX
         assert result.secondary_cause == SECONDARY_MAX
         assert result.total == 100.0
+
+    def test_low_capacity_battery_earns_full_secondary(self) -> None:
+        # claude-haiku-4-5 hard_compound e2, 2026-07-12 hard-tier run
+        # (scored 52.5/60): a verified two-part fix whose battery mode was
+        # phrased "aged battery with low capacity" — component-only credit
+        # until "low_capacity" -> weak was added to _MODE_SYNONYMS. Verbatim.
+        text = (
+            "Battery failed - aged battery with low capacity (voltage 10.77V "
+            "at rest, well below 12V nominal). The battery lacked sufficient "
+            "cranking power to start the engine, compounded by a corroded "
+            "ground strap that further degraded electrical system "
+            "performance. Both the battery and ground strap have been "
+            "replaced, restoring normal starting and charging operation."
+        )
+        scenario = get_scenario(COMPOUND)
+        primary = score_fault_mention(
+            text, scenario.root_cause.component,
+            scenario.root_cause.mode, PRIMARY_MAX,
+        )
+        secondary = score_fault_mention(
+            text, scenario.secondary_fault.component,
+            scenario.secondary_fault.mode, SECONDARY_MAX,
+        )
+        assert primary == PRIMARY_MAX
+        assert secondary == SECONDARY_MAX
 
     def test_primary_only_loses_the_secondary_share(self) -> None:
         result = _run_agent(
