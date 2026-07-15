@@ -74,7 +74,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         root_cause=InjectedFault(
             component=Component.GROUND_STRAP,
             mode=FailureMode.CORRODED,
-            severity={"added_resistance_ohms": 1.1},  # TODO(VERIFY)
+            severity={"added_resistance_ohms": 1.1},
         ),
         # Expert path: attempt_start (1) + 4 measurements (battery key_off,
         # battery cranking, ground drop cranking, feed drop cranking; 12)
@@ -92,13 +92,13 @@ SCENARIOS: dict[str, ScenarioDef] = {
         root_cause=InjectedFault(
             component=Component.GROUND_STRAP,
             mode=FailureMode.CORRODED,
-            severity={"added_resistance_ohms": 1.2},  # TODO(VERIFY): slightly worse ground
+            severity={"added_resistance_ohms": 1.2},  # slightly worse ground
         ),
         # Resting supply path uniformly suppressed as bait (NOT the root cause).
         # Under cranking the corroded ground physics naturally lets the battery
         # hold high (reduced current) while the ground-path drop appears — the tell.
         red_herring_voltages={
-            "battery_positive": 11.8,  # TODO(VERIFY): marginal but not dead; resting only
+            "battery_positive": 11.8,  # marginal but not dead; resting only
         },
         red_herring_component=Component.BATTERY,
         # Expert path: corroded-ground path (34 min, $25) + one extra battery
@@ -106,9 +106,9 @@ SCENARIOS: dict[str, ScenarioDef] = {
         # = 37 min, $25.
         expert_baseline_cost={"minutes": 37.0, "dollars": 25.0},
     ),
-    # --- HARD TIER PREVIEW (branch hard-tier-preview) ---------------------
-    # Physics for both scenarios below is PENDING HUMAN SIGN-OFF; see
-    # PENDING_HUMAN_PHYSICS_SIGNOFF.md. Do not publish results from these.
+    # --- HARD TIER --------------------------------------------------------
+    # Physics for both scenarios below signed off by the domain expert
+    # (Jaivir Parmar, 2026-07-12); see DOMAIN_TRUTH.md.
     "hard_intermittent_ecu_can": ScenarioDef(
         id="hard_intermittent_ecu_can",
         tier=ScenarioTier.HARD,
@@ -125,7 +125,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         root_cause=InjectedFault(
             component=Component.ECU_CAN_NODE,
             mode=FailureMode.INTERMITTENT,
-            severity={"manifest_probability": 0.35},  # TODO(VERIFY)
+            severity={"manifest_probability": 0.35},
         ),
         # Expert path: 4x attempt_start (4) — the fault only shows on some
         # cranks — + 2x scan_dtcs (4) + 2x read_pid can_status (2)
@@ -149,7 +149,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
             # Lower than the single-fault ground scenarios (1.1/1.2 Ω) on
             # purpose: a weaker choke on cranking current keeps the battery's
             # own load-test failure visible. See the signoff file.
-            severity={"added_resistance_ohms": 0.7},  # TODO(VERIFY)
+            severity={"added_resistance_ohms": 0.7},
         ),
         # SECONDARY: genuinely bad, not bait. 1.6 V below nominal on the whole
         # rail => ~11.0 V resting (vs the red-herring battery's 11.8 V) and
@@ -158,7 +158,7 @@ SCENARIOS: dict[str, ScenarioDef] = {
         secondary_fault=InjectedFault(
             component=Component.BATTERY,
             mode=FailureMode.WEAK,
-            severity={"terminal_drop_v": 1.6},  # TODO(VERIFY)
+            severity={"terminal_drop_v": 1.6},
         ),
         # Expert path: attempt_start (1) + 4 measurements (battery key_off,
         # battery cranking, ground drop cranking, feed drop cranking; 12)

@@ -61,46 +61,46 @@ class InjectedFault(BaseModel):
 # Severity parameter defaults — every numeric value marked for domain review.
 DEFAULT_SEVERITY: dict[tuple[Component, FailureMode], dict[str, float]] = {
     (Component.BATTERY, FailureMode.WEAK): {
-        "cca_remaining_pct": 45.0,  # TODO(VERIFY): weak battery CCA %
+        "cca_remaining_pct": 45.0,  # weak battery CCA %
         # How far the whole positive rail sits below nominal, in EVERY state
         # (low open-circuit voltage from a degraded battery). The nominal
         # cranking sag then applies on top of it, so a weak battery cranks
         # at (nominal crank − terminal_drop_v). Default preserves the
         # historical hard-coded −0.6 V; hard-tier scenarios raise it.
-        "terminal_drop_v": 0.6,  # TODO(VERIFY): rail offset for a weak battery
+        "terminal_drop_v": 0.6,  # rail offset for a weak battery
     },
     (Component.BATTERY, FailureMode.DEAD): {
-        "open_circuit_v": 2.1,  # TODO(VERIFY): terminal voltage when dead
+        "open_circuit_v": 2.1,  # terminal voltage when dead
     },
     (Component.GROUND_STRAP, FailureMode.CORRODED): {
-        "added_resistance_ohms": 0.8,  # TODO(VERIFY): added ground path R
+        "added_resistance_ohms": 0.8,  # added ground path R
     },
     (Component.GROUND_STRAP, FailureMode.BROKEN): {
-        "added_resistance_ohms": 50.0,  # TODO(VERIFY): open-circuit equivalent R
+        "added_resistance_ohms": 50.0,  # open-circuit equivalent R
     },
     (Component.STARTER_RELAY, FailureMode.STUCK_OPEN): {},
     (Component.STARTER_RELAY, FailureMode.STUCK_CLOSED): {},
     (Component.STARTER_MOTOR, FailureMode.WORN_BRUSHES): {
-        "crank_rpm_factor": 0.55,  # TODO(VERIFY): fraction of nominal crank RPM
+        "crank_rpm_factor": 0.55,  # fraction of nominal crank RPM
     },
     (Component.STARTER_MOTOR, FailureMode.SEIZED): {},
     (Component.ALTERNATOR, FailureMode.DIODE_FAILURE): {
-        "ac_ripple_v": 1.2,  # TODO(VERIFY): AC ripple on DC output
+        "ac_ripple_v": 1.2,  # AC ripple on DC output
     },
     (Component.ALTERNATOR, FailureMode.NO_OUTPUT): {
-        "output_v": 0.0,  # TODO(VERIFY): alternator output when failed
+        "output_v": 0.0,  # alternator output when failed
     },
     (Component.FUSIBLE_LINK, FailureMode.BLOWN): {},
     (Component.FUSIBLE_LINK, FailureMode.HIGH_RESISTANCE): {
-        "added_resistance_ohms": 2.5,  # TODO(VERIFY): fusible link high-R
+        "added_resistance_ohms": 2.5,  # fusible link high-R
     },
     (Component.IGNITION_SWITCH, FailureMode.NO_CRANK_SIGNAL): {},
     (Component.IGNITION_SWITCH, FailureMode.ACCESSORY_DROP): {
-        "voltage_drop_v": 2.5,  # TODO(VERIFY): accessory bus drop under load
+        "voltage_drop_v": 2.5,  # accessory bus drop under load
     },
     (Component.ECU_CAN_NODE, FailureMode.BUS_OFF): {},
     (Component.ECU_CAN_NODE, FailureMode.INTERMITTENT): {
-        "manifest_probability": 0.35,  # TODO(VERIFY): P(symptom on probe)
+        "manifest_probability": 0.35,  # P(symptom on probe)
     },
 }
 

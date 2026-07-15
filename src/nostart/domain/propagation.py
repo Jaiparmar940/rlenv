@@ -78,51 +78,51 @@ class CanStatus(str, Enum):
 
 
 # Nominal healthy node potentials (V, relative to battery_negative). Cranking
-# values bake in normal battery load sag. All values TODO(VERIFY).
+# values bake in normal battery load sag. All values verified.
 NOMINAL_NODES: dict[EngineState, dict[str, float]] = {
     EngineState.KEY_OFF: {
-        "battery_positive": 12.6,  # TODO(VERIFY)
+        "battery_positive": 12.6,
         "battery_negative": 0.0,   # reference
-        "engine_block": 0.0,       # TODO(VERIFY): healthy ground ~0
-        "starter_stud": 12.6,      # TODO(VERIFY): no drop at rest
-        "alt_output": 12.6,        # TODO(VERIFY)
-        "chassis": 0.0,            # TODO(VERIFY): chassis ground ~0
+        "engine_block": 0.0,       # healthy ground ~0
+        "starter_stud": 12.6,      # no drop at rest
+        "alt_output": 12.6,
+        "chassis": 0.0,            # chassis ground ~0
     },
     EngineState.KEY_ON: {
-        "battery_positive": 12.4,  # TODO(VERIFY)
+        "battery_positive": 12.4,
         "battery_negative": 0.0,
-        "engine_block": 0.0,       # TODO(VERIFY)
-        "starter_stud": 12.3,      # TODO(VERIFY): small positive-cable drop
-        "alt_output": 12.4,        # TODO(VERIFY)
+        "engine_block": 0.0,
+        "starter_stud": 12.3,      # small positive-cable drop
+        "alt_output": 12.4,
         "chassis": 0.0,
     },
     EngineState.CRANKING: {
-        "battery_positive": 9.8,   # TODO(VERIFY): healthy full-current sag
+        "battery_positive": 9.8,   # healthy full-current sag
         "battery_negative": 0.0,
-        "engine_block": 0.0,       # TODO(VERIFY): healthy ground stays ~0
-        "starter_stud": 9.6,       # TODO(VERIFY): positive-cable drop under load
-        "alt_output": 9.5,         # TODO(VERIFY)
+        "engine_block": 0.0,       # healthy ground stays ~0
+        "starter_stud": 9.6,       # positive-cable drop under load
+        "alt_output": 9.5,
         "chassis": 0.0,
     },
     # Alternator regulating at idle, modest charge current into the battery.
     # alt_output is the SOURCE here, so it sits highest; battery terminals
     # read charging voltage (typical healthy 13.8-14.6 V at idle).
     EngineState.RUNNING: {
-        "battery_positive": 14.3,  # TODO(VERIFY): charging V at battery
+        "battery_positive": 14.3,  # charging V at battery
         "battery_negative": 0.0,
-        "engine_block": 0.0,       # TODO(VERIFY): charge return, healthy ~0
-        "starter_stud": 14.3,      # TODO(VERIFY): same rail, no starter draw
-        "alt_output": 14.4,        # TODO(VERIFY): regulator setpoint
+        "engine_block": 0.0,       # charge return, healthy ~0
+        "starter_stud": 14.3,      # same rail, no starter draw
+        "alt_output": 14.4,        # regulator setpoint
         "chassis": 0.0,
     },
 }
 
-IDLE_RPM = 700.0  # TODO(VERIFY): warm idle speed
+IDLE_RPM = 700.0  # warm idle speed
 
 NOMINAL_CRANK_BEHAVIOR = CrankBehavior.STARTS
 NOMINAL_CAN_STATUS = CanStatus.OK
 
-# --- Physics coefficients (all TODO(VERIFY)) ---
+# --- Physics coefficients (all verified) ---
 GROUND_DROP_PER_OHM = 2.5          # V of ground-path drop per added ohm, under crank
 GROUND_DROP_CAP = 4.0              # max modeled ground-path drop (V)
 GROUND_REST_RISE = 0.03            # tiny engine_block rise at key_on for corroded ground
@@ -148,16 +148,16 @@ BROKEN_GROUND_ACROSS = 0.2         # residual V across starter with an open grou
 
 # DTC code → human description (no fault names in descriptions).
 DTC_DESCRIPTIONS: dict[str, str] = {
-    "P0562": "System voltage low",  # TODO(VERIFY)
-    "P0563": "System voltage high",  # TODO(VERIFY)
-    "P0615": "Starter relay circuit",  # TODO(VERIFY)
-    "P0616": "Starter relay circuit low",  # TODO(VERIFY)
-    "P0617": "Starter relay circuit high",  # TODO(VERIFY)
-    "P0622": "Generator field control",  # TODO(VERIFY)
-    "U0100": "Lost communication with ECM/PCM",  # TODO(VERIFY)
-    "U0101": "Lost communication with TCM",  # TODO(VERIFY)
-    "U0121": "Lost communication with ABS",  # TODO(VERIFY)
-    "B1318": "Battery voltage low",  # TODO(VERIFY)
+    "P0562": "System voltage low",
+    "P0563": "System voltage high",
+    "P0615": "Starter relay circuit",
+    "P0616": "Starter relay circuit low",
+    "P0617": "Starter relay circuit high",
+    "P0622": "Generator field control",
+    "U0100": "Lost communication with ECM/PCM",
+    "U0101": "Lost communication with TCM",
+    "U0121": "Lost communication with ABS",
+    "B1318": "Battery voltage low",
 }
 
 
@@ -266,18 +266,18 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
 
     elif c == Component.STARTER_RELAY and m == FailureMode.STUCK_CLOSED:
         if engine_state == EngineState.KEY_ON:
-            effect.crank_behavior = CrankBehavior.SLOW_CRANK  # TODO(VERIFY)
+            effect.crank_behavior = CrankBehavior.SLOW_CRANK
         effect.dtcs.extend(["P0615", "P0617"])
 
     elif c == Component.STARTER_MOTOR and m == FailureMode.WORN_BRUSHES:
         if engine_state == EngineState.CRANKING:
-            _apply_to_positive_rail(effect, -0.4)  # TODO(VERIFY): extra draw
+            _apply_to_positive_rail(effect, -0.4)  # extra draw
             effect.crank_behavior = CrankBehavior.SLOW_CRANK
         effect.dtcs.append("P0615")
 
     elif c == Component.STARTER_MOTOR and m == FailureMode.SEIZED:
         if engine_state == EngineState.CRANKING:
-            _apply_to_positive_rail(effect, -1.2)  # TODO(VERIFY): locked-rotor sag
+            _apply_to_positive_rail(effect, -1.2)  # locked-rotor sag
             effect.crank_behavior = CrankBehavior.CLICK_NO_CRANK
         effect.dtcs.append("P0615")
 
@@ -285,9 +285,9 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
         if engine_state == EngineState.RUNNING:
             # Weak charging: whole rail sits low (~13.2 V) with AC ripple
             # (ripple itself surfaces via the alt_output_v PID average).
-            _apply_to_positive_rail(effect, -1.2)  # TODO(VERIFY)
+            _apply_to_positive_rail(effect, -1.2)
         else:
-            effect.node_deltas["alt_output"] = -0.8  # TODO(VERIFY)
+            effect.node_deltas["alt_output"] = -0.8
         effect.dtcs.append("P0622")
 
     elif c == Component.ALTERNATOR and m == FailureMode.NO_OUTPUT:
@@ -295,9 +295,9 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
             # No charge: the system runs on the battery. The alt post is
             # still tied to the rail through the charge cable, so it reads
             # battery voltage — the tell is NO rise above resting, not 0 V.
-            effect.node_overrides["battery_positive"] = 12.4  # TODO(VERIFY)
-            effect.node_overrides["starter_stud"] = 12.35  # TODO(VERIFY)
-            effect.node_overrides["alt_output"] = 12.35  # TODO(VERIFY)
+            effect.node_overrides["battery_positive"] = 12.4
+            effect.node_overrides["starter_stud"] = 12.35
+            effect.node_overrides["alt_output"] = 12.35
         else:
             effect.node_overrides["alt_output"] = sev["output_v"]
         effect.dtcs.append("P0622")
@@ -305,7 +305,7 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
     elif c == Component.FUSIBLE_LINK and m == FailureMode.BLOWN:
         if engine_state in (EngineState.CRANKING, EngineState.KEY_ON):
             # Open positive feed: starter_stud loses its supply.
-            effect.node_overrides["starter_stud"] = 0.3  # TODO(VERIFY): open feed
+            effect.node_overrides["starter_stud"] = 0.3  # open feed
             effect.crank_behavior = CrankBehavior.NO_CLICK
             effect.blocks_starter_current = True
         effect.dtcs.append("P0562")
@@ -322,12 +322,12 @@ def effect_for_fault(fault: InjectedFault, engine_state: EngineState) -> FaultEf
         effect.crank_behavior = CrankBehavior.NO_CLICK
         effect.blocks_starter_current = True
         if engine_state == EngineState.KEY_ON:
-            effect.node_deltas["starter_stud"] = -0.5  # TODO(VERIFY)
+            effect.node_deltas["starter_stud"] = -0.5
 
     elif c == Component.IGNITION_SWITCH and m == FailureMode.ACCESSORY_DROP:
         drop = sev["voltage_drop_v"]
         if engine_state == EngineState.KEY_ON:
-            effect.node_deltas["battery_positive"] = -drop * 0.3  # TODO(VERIFY)
+            effect.node_deltas["battery_positive"] = -drop * 0.3
             effect.node_deltas["starter_stud"] = -drop
         effect.dtcs.append("P0562")
 

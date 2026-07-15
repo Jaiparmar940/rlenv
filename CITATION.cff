@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this environment or its results, please cite it as below."
+title: "no-start-env"
+abstract: >-
+  An agentic RL environment and eval: a simulated vehicle with electrical
+  no-start and charging faults that an LLM agent diagnoses and repairs using
+  realistic tools, scored by a cheat-resistant grader. Built on Inspect
+  (inspect-ai).
+type: software
+authors:
+  - family-names: "Parmar"
+    given-names: "Jaivir"
+version: "0.1.0"
+date-released: "2026-07-13"
+license: MIT
+repository-code: "https://github.com/Jaiparmar940/rlenv"
+url: "https://github.com/Jaiparmar940/rlenv"
+keywords:
+  - evaluation
+  - benchmark
+  - agents
+  - large-language-models
+  - inspect-ai
+  - physical-diagnosis
+  - fault-diagnosis

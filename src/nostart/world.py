@@ -47,43 +47,43 @@ class EpisodeStatus(BaseModel):
 VISUAL_NOTES: dict[str, dict[str, str]] = {
     "battery": {
         "healthy": "Terminals clean, no swelling, date code legible.",
-        "weak": "Terminal corrosion light; case looks aged.",  # TODO(VERIFY)
-        "dead": "Terminals corroded; slight sulfation odor.",  # TODO(VERIFY)
+        "weak": "Terminal corrosion light; case looks aged.",
+        "dead": "Terminals corroded; slight sulfation odor.",
     },
     "ground_strap": {
         "healthy": "Engine-to-chassis strap intact, bolt tight.",
-        "corroded": "Strap end greenish; could be overlooked.",  # TODO(VERIFY): subtle
-        "broken": "Strap frayed at engine block attachment.",  # TODO(VERIFY)
+        "corroded": "Strap end greenish; could be overlooked.",  # subtle
+        "broken": "Strap frayed at engine block attachment.",
     },
     "starter_relay": {
         "healthy": "Relay clicks once on crank attempt.",
-        "stuck_open": "No click heard at relay.",  # TODO(VERIFY)
-        "stuck_closed": "Click persists after key release.",  # TODO(VERIFY)
+        "stuck_open": "No click heard at relay.",
+        "stuck_closed": "Click persists after key release.",
     },
     "starter_motor": {
         "healthy": "No unusual noise during crank.",
-        "worn_brushes": "Grinding noise during slow crank.",  # TODO(VERIFY)
-        "seized": "Loud clunk, no rotation.",  # TODO(VERIFY)
+        "worn_brushes": "Grinding noise during slow crank.",
+        "seized": "Loud clunk, no rotation.",
     },
     "alternator": {
         "healthy": "Belt intact, no burnt smell.",
-        "diode_failure": "Faint whine from alternator area.",  # TODO(VERIFY)
-        "no_output": "Belt intact; connector looks seated.",  # TODO(VERIFY)
+        "diode_failure": "Faint whine from alternator area.",
+        "no_output": "Belt intact; connector looks seated.",
     },
     "fusible_link": {
         "healthy": "Link intact at battery positive junction.",
-        "blown": "Link appears melted at mid-span.",  # TODO(VERIFY)
-        "high_resistance": "Link discolored but not open.",  # TODO(VERIFY)
+        "blown": "Link appears melted at mid-span.",
+        "high_resistance": "Link discolored but not open.",
     },
     "ignition_switch": {
         "healthy": "Key cycles smoothly through positions.",
-        "no_crank_signal": "Dash lights flicker in START.",  # TODO(VERIFY)
-        "accessory_drop": "Lights dim sharply in START.",  # TODO(VERIFY)
+        "no_crank_signal": "Dash lights flicker in START.",
+        "accessory_drop": "Lights dim sharply in START.",
     },
     "ecu_can_node": {
         "healthy": "OBD connector pins clean.",
-        "bus_off": "MIL on; scan tool connection intermittent.",  # TODO(VERIFY)
-        "intermittent": "No obvious wiring damage at ECM.",  # TODO(VERIFY)
+        "bus_off": "MIL on; scan tool connection intermittent.",
+        "intermittent": "No obvious wiring damage at ECM.",
     },
 }
 
@@ -233,7 +233,7 @@ class World:
         delta = self._rng.uniform(-band, band)
         return round(value + delta, 2)
 
-    VOLTAGE_NOISE_BAND = 0.05  # TODO(VERIFY): ±0.05 V meter noise
+    VOLTAGE_NOISE_BAND = 0.05  # ±0.05 V meter noise
 
     def _get_active_fault_for_component(self, component: Component) -> InjectedFault | None:
         for f in self._active_faults:
@@ -276,7 +276,7 @@ class World:
             for f in self._active_faults:
                 if f.component == Component.ALTERNATOR and f.mode.value == "diode_failure":
                     sev = merge_severity(f)
-                    v -= sev.get("ac_ripple_v", 0.0) * 0.1  # TODO(VERIFY): PID shows depressed avg
+                    v -= sev.get("ac_ripple_v", 0.0) * 0.1  # PID shows depressed avg
             return {"pid": "alt_output_v", "value": self._noise_band(v, 0.08),
                     "unit": "V", "engine_state": es}
         if key == "rpm":
@@ -362,7 +362,7 @@ class World:
         mode_key = fault.mode.value
         # Corroded ground may be missed (subtle fault).
         if comp == Component.GROUND_STRAP and fault.mode.value == "corroded":
-            if self._rng.random() > 0.4:  # TODO(VERIFY): 40% chance to spot
+            if self._rng.random() > 0.4:  # 40% chance to spot
                 return "Strap looks normal at a glance."
         return notes.get(mode_key, notes.get("healthy", "No obvious defects."))
 

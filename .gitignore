@@ -28,7 +28,18 @@ venv/
 .env
 .DS_Store
 
-# Eval outputs (regenerate with scripts/run_evals.py; publish copies the
-# results table into the README explicitly)
-results/
+# Eval outputs.
+#
+# The generated markdown reports (results/results.md, results/scale_curve.md,
+# results/audit.md) are the PUBLISHED RECORD of a run and stay tracked, along
+# with the hand-written results/clean_clone.md. Raw Inspect logs and
+# per-episode transcripts are large and regenerable (scripts/run_evals.py) —
+# ignore those.
+results/logs/
+results/transcripts/
+
+# Alternate run output dirs, e.g. scripts/smoke_eval.sh --out results-smoke.
 results-*/
+
+# Agent tooling scratch worktrees.
+.claude/worktrees/

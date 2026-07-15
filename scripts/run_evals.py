@@ -74,6 +74,44 @@ MOCK_SCRIPTS: dict[str, list[tuple[str, dict]]] = {
         ("attempt_start", {}),
         ("finish", {"answer": "ground_strap corroded"}),
     ],
+    # Expert path per the inline baseline in scenarios.py: probe across
+    # several cranks (the fault only shows on some), confirm the CAN status
+    # is intermittently degraded, replace the ECU node, verify the start.
+    "hard_intermittent_ecu_can": [
+        ("attempt_start", {}),
+        ("attempt_start", {}),
+        ("attempt_start", {}),
+        ("attempt_start", {}),
+        ("scan_dtcs", {}),
+        ("scan_dtcs", {}),
+        ("read_pid", {"pid": "can_status"}),
+        ("read_pid", {"pid": "can_status"}),
+        ("replace_part", {"component": "ecu_can_node"}),
+        ("attempt_start", {}),
+        ("finish", {"answer": "ecu_can_node intermittent"}),
+    ],
+    # Two real faults; neither repair alone starts the car, so the expert
+    # buys both parts. Mirrors _EXPERT_STEPS in tests/test_hard_tier.py; the
+    # finish phrasing is the one pinned there as full root-cause credit.
+    "hard_compound_battery_and_ground": [
+        ("attempt_start", {}),
+        ("measure_voltage", {"point_a": "battery_positive",
+                             "point_b": "battery_negative",
+                             "engine_state": "key_off"}),
+        ("measure_voltage", {"point_a": "battery_positive",
+                             "point_b": "battery_negative",
+                             "engine_state": "cranking"}),
+        ("measure_voltage", {"point_a": "battery_negative",
+                             "point_b": "engine_block",
+                             "engine_state": "cranking"}),
+        ("measure_voltage", {"point_a": "battery_positive",
+                             "point_b": "starter_stud",
+                             "engine_state": "cranking"}),
+        ("replace_part", {"component": "ground_strap"}),
+        ("replace_part", {"component": "battery"}),
+        ("attempt_start", {}),
+        ("finish", {"answer": "corroded ground strap, plus a weak battery"}),
+    ],
 }
 
 

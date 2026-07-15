@@ -97,27 +97,40 @@ PAGE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>no-start-env</title>
 <style>
-  :root { color-scheme: light dark; }
+  /* Force dark regardless of the OS/browser theme: under a light theme the
+     UA painted inputs and log text near-white on white. Every surface below
+     sets both background AND color explicitly — no UA defaults left. */
+  :root { color-scheme: dark;
+          --bg: #14161a; --fg: #e8e8ea; --panel: #1d2027; --line: #3a3f4a;
+          --muted: #a0a4ad; --accent: #4a6cd4; }
+  html { background: var(--bg); }
   body { font-family: -apple-system, sans-serif; margin: 0; padding: 12px;
-         max-width: 640px; margin-inline: auto; }
-  h1 { font-size: 1.1rem; }
-  fieldset { border: 1px solid #8884; border-radius: 8px; margin: 8px 0;
-             padding: 8px; }
-  legend { font-size: .8rem; opacity: .7; }
+         max-width: 640px; margin-inline: auto;
+         background: var(--bg); color: var(--fg); }
+  h1 { font-size: 1.1rem; color: var(--fg); }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0;
+             padding: 8px; background: var(--panel); }
+  legend { font-size: .8rem; color: var(--muted); }
   select, input[type=text] { font-size: 1rem; padding: 6px; margin: 2px;
-             border-radius: 6px; border: 1px solid #8886; max-width: 100%; }
+             border-radius: 6px; border: 1px solid var(--line);
+             max-width: 100%; background: var(--bg); color: var(--fg); }
+  option { background: var(--bg); color: var(--fg); }
   button { font-size: 1rem; padding: 8px 14px; margin: 3px; border-radius: 8px;
-           border: 1px solid #8886; background: #4a6cd4; color: #fff; }
+           border: 1px solid var(--accent); background: var(--accent);
+           color: #fff; }
   button:active { opacity: .7; }
-  #complaint { font-style: italic; }
-  #cost { font-size: .85rem; opacity: .8; }
+  #complaint { font-style: italic; color: var(--fg); }
+  #cost { font-size: .85rem; color: var(--muted); }
   #log { display: flex; flex-direction: column-reverse; gap: 6px; }
-  .entry { border: 1px solid #8883; border-radius: 8px; padding: 6px 8px;
-           font-size: .85rem; }
+  .entry { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
+           font-size: .85rem; background: var(--panel); color: var(--fg); }
   .entry .act { font-weight: 600; }
-  .err { color: #d44; }
-  pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; }
-  .grade { border: 2px solid #4a6cd4; }
+  .err { color: #ff7b7b; }
+  pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0;
+        color: var(--fg); }
+  textarea { background: var(--bg); color: var(--fg);
+             border: 1px solid var(--line); border-radius: 6px; }
+  .grade { border: 2px solid var(--accent); }
 </style>
 </head><body>
 <h1>🔧 no-start-env — scenario play</h1>

@@ -8,7 +8,9 @@ set -euo pipefail
 
 MODEL="${1:-anthropic/claude-haiku-4-5}"
 cd "$(dirname "$0")/.."
+# venv layout differs by platform (posix: bin/, Windows: Scripts/python.exe).
 PY=".venv/bin/python"
+[ -x "$PY" ] || PY=".venv/Scripts/python.exe"
 [ -x "$PY" ] || PY="python"
 
 "$PY" scripts/run_evals.py \
