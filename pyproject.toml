@@ -11,10 +11,24 @@ requires-python = ">=3.11"
 dependencies = [
     "inspect-ai>=0.3.0",
     "pydantic>=2.0",
+    # scripts/run_evals.py imports dotenv directly to load provider keys from
+    # .env. It currently arrives transitively via inspect-ai; declare it so a
+    # future inspect-ai release cannot silently break the clean-clone install.
+    "python-dotenv>=1.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Provider SDKs for real-model runs. Inspect ships each provider's client as an
+# optional dependency, so a bare install can only do `run_evals.py --mock`;
+# without these, `--models anthropic/...` fails with a PrerequisiteError.
+# Install what you need:  pip install -e ".[dev,models]"
+models = [
+    "anthropic>=0.40",     # anthropic/<model>
+    "openai>=1.50",        # openai/<model>
+    "google-genai>=1.0",   # google/<model>
+    "xai-sdk>=0.1",        # grok/<model>
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nostart"]

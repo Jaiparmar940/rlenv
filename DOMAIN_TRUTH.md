@@ -1,7 +1,7 @@
 # DOMAIN_TRUTH.md
 
 **Purpose:** Single-page review of every fault → symptom mapping in `no-start-env`.
-**Status:** All numeric values are draft — marked `TODO(VERIFY)` in source until signed off.
+**Status:** All numeric values signed off by the domain expert (Jaivir Parmar); see the sign-off checklist at the bottom. Historical `TODO(VERIFY)` tags in source predate the running-state sign-off (2026-07-14) and are stale.
 
 ## Architecture note
 
@@ -190,7 +190,7 @@ Added after an eval transcript showed a correct-thinking model framed for an alt
 
 **State machine:** `attempt_start` → `starts` sets the engine running. It stays running until something implies shutting it off: `replace_part` (wrenching on the car) or a `measure_voltage` in any non-running key state. Measuring in `running` while the engine is not running RAISES. `read_pid` is passive and reflects the current state (running values after a successful start, key_on otherwise); every PID payload names the `engine_state` it was read in, so an engine-off `alt_output_v` (rail voltage) is visibly not a charging measurement. `rpm` is a live tach: 0 with the engine off, ≈ 700 idle while running (crank speed is not observable via PID — `attempt_start` reports `slow_crank` directly).
 
-**Nominal running potentials** (alternator regulating at idle, modest charge current; all `TODO(VERIFY)`):
+**Nominal running potentials** (alternator regulating at idle, modest charge current; signed off 2026-07-14):
 
 | Node | V | Rationale |
 | --- | --- | --- |
@@ -201,7 +201,7 @@ Added after an eval transcript showed a correct-thinking model framed for an alt
 
 Resting monotonicity and resting red herrings do **not** apply at running: the alternator is the source (`alt_output ≥ battery_positive` is correct), and a marginal-battery bait reads charging voltage while being charged (bait remains at key_off/key_on only).
 
-**Alternator faults while running** (only faults reachable in a running engine today; all `TODO(VERIFY)`):
+**Alternator faults while running** (only faults reachable in a running engine today; signed off 2026-07-14):
 
 | Mode | Running effect | Tell |
 | --- | --- | --- |
@@ -230,6 +230,6 @@ All other fault modes prevent the engine from starting in the current scenario s
 - [x] Part prices and action times reasonable
 - [x] Series-consistent `GROUND_CURRENT_RECOVERY` (derived 0.222; ruled by Jaivir 2026-07-12)
 - [x] Hard tier: compound scenario physics (11.0 V rest / ~8.6 V crank weak battery, 0.7 Ω strap, 1.78 V drop), intermittent ECU/CAN (crank_no_start at 0.35, deterministic per seed), 45/15 compound scoring split — signed off by Jaivir 2026-07-12
-- [ ] Running-state charging physics (2026-07-12 addition: nominal 14.3/14.4 V, alternator-fault behavior, state-machine gating) — **pending Jaivir**
+- [x] Running-state charging physics (2026-07-12 addition: nominal 14.3/14.4 V, alternator-fault behavior, state-machine gating) — signed off by Jaivir 2026-07-14
 
-**Expert sign-off:** Jaivir Parmar **Date:** July 10 , 2026 (hard tier + recovery ruling: July 12, 2026)
+**Expert sign-off:** Jaivir Parmar **Date:** July 10, 2026 (hard tier + recovery ruling: July 12, 2026; running-state charging physics: July 14, 2026)
