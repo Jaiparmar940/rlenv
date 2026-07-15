@@ -43,3 +43,8 @@ results-*/
 
 # Agent tooling scratch worktrees.
 .claude/worktrees/
+
+# Internal-only docs — kept locally, never published.
+YC_APP_DRAFT.md
+CLOSEOUT_STATUS.md
+V0.2.md
