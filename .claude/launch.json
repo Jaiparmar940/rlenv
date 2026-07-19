@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "site",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "http.server", "8712", "--directory", "/Users/jaivir-agent1/Desktop/groundtruth-site"],
+      "port": 8712
+    }
+  ]
+}
