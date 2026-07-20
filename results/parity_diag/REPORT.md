@@ -4,7 +4,17 @@ Run 2026-07-20. Question: is the haiku side-by-side gap (red-herring 0.0 vs
 26.2, compound 0.0 vs 77.5) variance, or does the ORS serving path change what
 the model experiences or how it is graded?
 
-## VERDICT (Phases 1–2): DIVERGENCE FOUND — context and harness, not grading
+## FINAL VERDICT: DIVERGENCE FOUND → FIXED → PARITY CONFIRMED
+
+Phases 1–2 found real context/harness divergences (below), all fixed on the
+branch; Phase 3 (haiku × 5 epochs × both scenarios × both pipelines) then
+showed **no systematic ORS inflation** — ORS came out *lower* on red-herring
+(mean 6.3 vs 34.3) and statistically indistinguishable on compound (58.0 vs
+61.0), with per-episode distributions bimodal and overlapping (details in the
+Phase 3 section). The original 26.2/77.5 anomaly was the harness divergence
+plus variance, and no longer reproduces.
+
+## Phase 1–2 diagnosis (pre-fix): DIVERGENCE FOUND — context and harness, not grading
 
 The grader and prompts are parity-clean. The divergence is real and lives in
 two places: (1) the **model-visible tool specifications** served by the ORS
@@ -141,7 +151,24 @@ alternator), verified the start, called `finish("ground_strap corroded; ...")`
   — which the Phase 1 context/harness differences (and model stochasticity)
   produce.
 
-## Proposed minimal fixes (make ORS match Inspect; awaiting go)
+## Fixes applied (2026-07-20, after go)
+
+All proposed fixes below were applied — adapter items 1–2 as proposed; item 3
+amended: raising turned out to surface as a client-side `ToolFailed`
+exception with a session-id prefix baked into the message (and an unknown
+platform harness may fatal on it rather than show the model the error), so
+the adapter instead returns the BARE error message (byte-identical to
+Inspect's ToolError text) as a normal result with
+`metadata={"is_error": True}`, which the reference harness renders as
+Inspect does (`is_error: true`, bare string content). Harness items 4–7 as
+proposed. New regression test
+`test_tool_specs_byte_match_inspect_serialization` derives Inspect's specs
+via `ToolDef` at test time and byte-compares the anthropic-format conversion
+of the served specs (plus pinned `finish` strings from the capture). 120
+tests green; Part A deterministic replay re-verified exact (100.0 = 100.0,
+all 5 scenarios). Phase 3 results below.
+
+## Original proposed fixes (for the record)
 
 **Adapter (`src/nostart/openreward/env.py`) — served surface:**
 
@@ -171,12 +198,44 @@ alternator), verified the start, called `finish("ground_strap corroded; ...")`
 Not proposed: any change to the core environment, grader, prompts, or the
 Inspect pipeline (canonical).
 
-**Card impact:** `docs/openreward_card.md`'s parity section currently claims
-tool descriptions/schemas "match the Inspect task exactly" — the evidence
-shows prompts byte-identical but tool specs divergent, so the card has been
-softened to claim only what is verified until the fixes land.
+**Card impact:** the card's parity section was softened at the checkpoint;
+after the fixes and Phase 3 it now claims exactly what is verified: prompts
+AND tool specs byte-matched (regression-tested), reward mapping exact on
+deterministic replay, model-level scores comparable within sampling variance.
 
-## Phase 3 — not run
+## Phase 3 — statistical check after fixes (20 haiku episodes)
 
-Held per the checkpoint. After fixes: haiku × 5 epochs × {red-herring,
-compound} × both pipelines (20 episodes) to confirm distributions overlap.
+`phase3.py`; per-episode scores in `phase3_results.json`.
+
+| scenario | pipeline | per-epoch scores | mean | root-ok |
+| --- | --- | --- | --- | --- |
+| red-herring | Inspect | 57.6, 56.4, 57.2, 0.0, 0.0 | 34.3 | 3/5 |
+| red-herring | ORS | 0.0, 0.0, 0.0, 0.0, 31.5 | 6.3 | 1/5 |
+| compound | Inspect | 80.8, 61.2, 81.7, 81.4, 0.0 | 61.0 | 1/5 |
+| compound | ORS | 42.5, 80.8, 77.2, 39.4, 50.0 | 58.0 | 0/5 |
+
+Reading:
+
+- **No systematic ORS inflation** — the suspicious direction (ORS high)
+  reversed on red-herring and vanished on compound. Both columns draw from
+  the same bimodal per-episode distributions (red-herring: ~0 or ~57;
+  compound: ~40–82 or 0); 3/5 vs 1/5 successes at n=5 is within binomial
+  noise.
+- **The termination fix is visible in the transcripts:** 4 of 5 ORS
+  red-herring episodes now end via the 50-message cap (`message_cap`),
+  exactly the failure mode Inspect's episodes show, instead of the pre-fix
+  early plain-message grading.
+- Note on the published benchmark: this fresh Inspect column itself differs
+  from the published haiku cells (red-herring 0-for-5 published vs 3/5 here)
+  — haiku's per-cell variance at n=5 is large in both pipelines. The parity
+  question (ORS vs Inspect) is settled by the columns tracking each other;
+  neither pipeline is claimed to reproduce the published point estimates.
+
+**Residual known micro-divergences, documented not fixed:** (a) if a model
+batches more tool calls after `finish` in the same assistant turn, Inspect
+executes them before scoring while ORS grades at the `finish` call (not
+observed in any transcript; models submit alone); (b) Inspect's
+prompt-caching `cache_control` markers and `extra_headers` are
+transport-level and model-invisible; (c) ORS tool specs carry
+`type: "custom"` where Inspect omits the field — semantically identical to
+the API.

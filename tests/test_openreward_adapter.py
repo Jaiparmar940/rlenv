@@ -23,6 +23,7 @@ from nostart.openreward.env import (
     EndOfEpisodeParams,
     FinishParams,
     MeasureVoltageParams,
+    NoParams,
     NoStartEnv,
     ReadPidParams,
     ReplacePartParams,
@@ -94,7 +95,7 @@ def test_tool_specs_and_prompt_contain_no_ground_truth() -> None:
 def test_grade_breakdown_only_in_terminal_metadata() -> None:
     env = _env("ns-01")
     for out in (
-        env.scan_dtcs(),
+        env.scan_dtcs(NoParams()),
         env.read_pid(ReadPidParams(pid="battery_voltage")),
     ):
         assert out.metadata is None
@@ -132,6 +133,44 @@ def test_tool_surface_matches_inspect() -> None:
     assert "grade_final_message" not in names
 
 
+def test_tool_specs_byte_match_inspect_serialization() -> None:
+    """The anthropic-format tool specs a client receives must byte-match what
+    Inspect serialized for the published run (parity fix from
+    results/parity_diag/REPORT.md)."""
+    from inspect_ai.tool import ToolDef
+    from openreward.api.environments.client import convert_tool_response
+
+    from nostart.task import ALL_TOOLS
+
+    listing = NoStartEnv.list_tools()
+    res = {"tools": [t.model_dump() for t in listing.tools]}
+    served = {t["name"]: t for t in convert_tool_response(res, "anthropic")}
+
+    for inspect_tool in ALL_TOOLS:
+        td = ToolDef(inspect_tool)
+        assert served[td.name]["description"] == td.description
+        assert served[td.name]["input_schema"] == td.parameters.model_dump(
+            exclude_none=True
+        )
+
+    # finish is built by basic_agent (submit tool + task.py's
+    # submit_description); pinned to the wire capture of the published run.
+    fin = served["finish"]
+    assert fin["description"] == (
+        "Submit your final diagnosis. BEGIN your answer with the faulty "
+        "component and its failure mode (e.g. 'fusible_link blown'); "
+        "supporting reasoning may follow."
+    )
+    assert fin["input_schema"] == {
+        "additionalProperties": False,
+        "properties": {
+            "answer": {"description": "Submitted answer", "type": "string"}
+        },
+        "required": ["answer"],
+        "type": "object",
+    }
+
+
 def test_observations_match_toolsession_serialization() -> None:
 
 
@@ -153,18 +192,22 @@ def test_observations_match_toolsession_serialization() -> None:
     assert out.blocks[0].text == expected
 
 
-def test_invalid_measure_input_is_model_visible_error_not_crash() -> None:
-
-
+def test_invalid_measure_input_bare_message_with_error_flag() -> None:
+    # Inspect shows the model ToolError's bare message with is_error: true.
+    # The adapter returns the same bare text (no prefix) plus a metadata flag
+    # so harnesses can frame it as an error (raising instead would surface as
+    # a client-side ToolFailed exception that unknown harnesses may fatal on).
     env = _env("ns-01")
     out = env.measure_voltage(
         MeasureVoltageParams(
-            point_a="flux_capacitor", point_b="chassis", engine_state="key_off"
+            point_a="flux_capacitor", point_b="chassis",
+            engine_state="key_off",
         )
     )
     assert out.finished is False
-    assert out.blocks[0].text.startswith("Error: ")
-    assert "flux_capacitor" in out.blocks[0].text
+    assert out.metadata == {"is_error": True}
+    assert out.blocks[0].text.startswith("Unknown node 'flux_capacitor'")
+    assert not out.blocks[0].text.startswith("Error")
 
 
 # --- Determinism ------------------------------------------------------------
@@ -174,8 +217,8 @@ def test_identical_sessions_produce_identical_observations() -> None:
 
 
     def run(env: NoStartEnv) -> list[str]:
-        stream = [env.scan_dtcs().blocks[0].text]
-        stream.append(env.attempt_start().blocks[0].text)
+        stream = [env.scan_dtcs(NoParams()).blocks[0].text]
+        stream.append(env.attempt_start(NoParams()).blocks[0].text)
         stream.append(
             env.measure_voltage(
                 MeasureVoltageParams(
@@ -211,7 +254,7 @@ def _expert_fix(env: NoStartEnv) -> None:
         )
     )
     env.replace_part(ReplacePartParams(component="battery"))
-    env.attempt_start()
+    env.attempt_start(NoParams())
 
 
 def test_finish_reward_is_grader_total_over_100() -> None:

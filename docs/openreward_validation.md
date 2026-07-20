@@ -1,5 +1,13 @@
 # OpenReward serving validation (Phase 3)
 
+> **2026-07-20 update:** the Part B numbers below predate the parity fixes.
+> A wire-level parity diagnosis found and fixed model-visible divergences
+> (tool-spec serialization, harness termination semantics, max_tokens, error
+> framing); the canonical parity record — including a 20-episode two-pipeline
+> re-check confirming no systematic score difference — is
+> `results/parity_diag/REPORT.md`. Part A (deterministic exact-match) was
+> re-verified after the fixes and still holds.
+
 Run 2026-07-20 on the working tree that introduced the adapter
 (`src/nostart/openreward/`), reproducible via
 `scripts/validate_openreward.py`. The script starts the ORS server locally,
