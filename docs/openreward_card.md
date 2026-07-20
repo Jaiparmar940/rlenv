@@ -82,12 +82,18 @@ published Inspect run: **block 1 is the system prompt** (uncoached variant:
 role, tool reference, job definition, cost one-liner — no strategy, no grader
 rules), **block 2 is the user message** (customer complaint + task statement).
 ORS blocks carry no role; harnesses that support a system role should map
-block 1 there. Both prompt blocks are verified byte-identical to the
-published run's wire-level API payloads (see `results/parity_diag/` in the
-repo). Tool names and the `finish(answer)` call match; tool description and
-schema serialization currently differ from Inspect's in documented ways
-(parity work tracked in `results/parity_diag/REPORT.md`), so treat scores as
-comparable with, not identical to, the published table below.
+block 1 there. Parity with the published run is verified at the wire level
+(`results/parity_diag/REPORT.md` in the repo): both prompt blocks and all
+tool descriptions/schemas are byte-matched to the API payloads Inspect
+serialized for the published benchmark (pinned by a regression test), the
+reward mapping is exact on deterministic replay, and a 20-episode
+two-pipeline check found no systematic score difference. Model-level scores
+remain subject to ordinary sampling variance, and harness behavior matters:
+to reproduce the published conditions, run episodes `basic_agent`-style
+(nudge on plain assistant messages — "Please proceed to the next step using
+your best judgement." — 50-message cap counting every message, tool errors
+rendered as `is_error` with the bare message; reference implementation in
+`scripts/validate_openreward.py`).
 
 ## Environment difficulty (published v0.1 results)
 

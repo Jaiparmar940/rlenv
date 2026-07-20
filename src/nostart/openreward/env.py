@@ -26,9 +26,18 @@ Parity decisions (mirroring the published Inspect benchmark, v0.1):
   under opaque ids (``ns-01``..``ns-05``) with the mapping held server-side.
   Tier is included as it is non-identifying and useful for curricula.
 - **Invalid tool input** (``measure_voltage`` on a bad node/state) returns the
-  error text as an ordinary tool result block — the same message the model
-  sees via ToolError under Inspect, without relying on harness-specific
-  RunToolError rendering.
+  BARE error message (byte-identical to the text Inspect's ToolError shows the
+  model) as a normal tool result with ``metadata={"is_error": True}``.
+  Raising instead was rejected: the ORS server turns tool exceptions into
+  client-side ``ToolFailed`` exceptions with a session-id prefix in the
+  message, and an unknown harness may kill the episode on them rather than
+  show the model the error. Harnesses that honor the metadata flag (like
+  scripts/validate_openreward.py) can render ``is_error: true`` + the bare
+  string, byte-matching Inspect's wire behavior.
+- **Tool-spec serialization** is byte-matched to Inspect's wire payloads
+  (descriptions without Returns sections, docstring line breaks preserved,
+  ``additionalProperties: false``, ``required: []`` on no-arg tools) —
+  verified against the captures in results/parity_diag/.
 """
 
 from __future__ import annotations
@@ -36,7 +45,7 @@ from __future__ import annotations
 import json
 from typing import Any, Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from openreward.environments import (
     Environment,
@@ -85,60 +94,76 @@ class NoStartTaskSpec(BaseModel):
     tier: str | None = None  # informational; ignored on input
 
 
+# Every params model below is a byte-level mirror of what Inspect serializes
+# for the published run (verified against wire captures in
+# results/parity_diag/): extra="forbid" reproduces additionalProperties:false,
+# the Field descriptions reproduce the task.py docstring Args entries
+# INCLUDING their line breaks, and NoParams reproduces the empty schema with
+# an explicit required:[]. Do not reflow these strings.
+
+
+class NoParams(BaseModel):
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"required": []})
+
+
 class ReadPidParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     pid: str = Field(
         description="One of: battery_voltage, alt_output_v, rpm, can_status."
     )
 
 
 class MeasureVoltageParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     point_a: str = Field(
         description=(
-            "Red probe node. One of: battery_positive, battery_negative, "
-            "engine_block, starter_stud, alt_output, chassis."
+            "Red probe node. One of: battery_positive,\n"
+            "battery_negative, engine_block, starter_stud, alt_output,\n"
+            "chassis."
         )
     )
     point_b: str = Field(description="Black probe node. Same options as point_a.")
     engine_state: str = Field(
         description=(
-            "Vehicle state during the measurement. One of: key_off, key_on, "
-            "cranking, running. The running state is only available while "
-            "the engine is actually running (after a successful start "
-            "attempt)."
+            "Vehicle state during the measurement. One of:\n"
+            "key_off, key_on, cranking, running. The running state is\n"
+            "only available while the engine is actually running (after\n"
+            "a successful start attempt)."
         )
     )
 
 
 class VisualInspectParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     area: str = Field(
         description=(
-            "Component to inspect (e.g. battery, ground_strap, starter_relay, "
-            "starter_motor, alternator, fusible_link, ignition_switch, "
-            "ecu_can_node)."
+            "Component to inspect (e.g. battery, ground_strap,\n"
+            "starter_relay, starter_motor, alternator, fusible_link,\n"
+            "ignition_switch, ecu_can_node)."
         )
     )
 
 
 class ReplacePartParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     component: str = Field(
         description=(
-            "Component to replace (battery, ground_strap, starter_relay, "
-            "starter_motor, alternator, fusible_link, ignition_switch, "
-            "ecu_can_node)."
+            "Component to replace (battery, ground_strap,\n"
+            "starter_relay, starter_motor, alternator, fusible_link,\n"
+            "ignition_switch, ecu_can_node)."
         )
     )
 
 
 class FinishParams(BaseModel):
-    # Named "answer" to match the Inspect basic_agent submit-tool schema the
-    # published benchmark exposed to models.
-    answer: str = Field(
-        description=(
-            "Your final diagnosis. BEGIN your answer with the faulty "
-            "component and its failure mode (e.g. 'fusible_link blown'); "
-            "supporting reasoning may follow."
-        )
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    # Name AND description match the Inspect basic_agent submit tool exactly.
+    answer: str = Field(description="Submitted answer")
 
 
 class EndOfEpisodeParams(BaseModel):
@@ -200,66 +225,55 @@ class NoStartEnv(Environment):
         ]
 
     # --- Diagnostic tools (reward 0, never terminate) ---
+    #
+    # Docstrings below are the DESCRIPTIONS the model sees, byte-matched to
+    # what Inspect serializes for the published run: its docstring parser
+    # strips the Args/Returns sections from task.py's docstrings, so no
+    # Returns text may appear here. Do not reflow.
 
     @tool
-    def scan_dtcs(self) -> ToolOutput:
-        """Scan the vehicle for stored diagnostic trouble codes (DTCs).
-
-        Returns a JSON list of {code, description}.
-        """
+    def scan_dtcs(self, params: NoParams) -> ToolOutput:
+        """Scan the vehicle for stored diagnostic trouble codes (DTCs)."""
         return ToolOutput(blocks=_text(_dump(self._session.scan_dtcs())))
 
     @tool
     def read_pid(self, params: ReadPidParams) -> ToolOutput:
         """Read a live scan-tool parameter. Reflects the vehicle's current
         state: engine running if it has been started, otherwise key_on
-        (engine off). The payload names the state it was read in.
-
-        Returns JSON with {pid, value, unit, engine_state}.
-        """
+        (engine off). The payload names the state it was read in."""
         return ToolOutput(blocks=_text(_dump(self._session.read_pid(params.pid))))
 
     @tool
     def measure_voltage(self, params: MeasureVoltageParams) -> ToolOutput:
-        """Measure DC voltage V(point_a) minus V(point_b) with a multimeter.
-
-        Returns JSON with the reading in volts (meter noise about ±0.05 V).
-        """
+        """Measure DC voltage V(point_a) minus V(point_b) with a multimeter."""
         try:
             result = self._session.measure_voltage(
                 params.point_a, params.point_b, params.engine_state
             )
         except ValueError as exc:
-            return ToolOutput(blocks=_text(f"Error: {exc}"))
+            # Bare message (what Inspect's ToolError shows the model) + a
+            # metadata flag so harnesses can frame it as is_error: true.
+            return ToolOutput(blocks=_text(str(exc)),
+                              metadata={"is_error": True})
         return ToolOutput(blocks=_text(_dump(result)))
 
     @tool
     def visual_inspect(self, params: VisualInspectParams) -> ToolOutput:
-        """Visually inspect a component area and report what a tech would see.
-
-        Returns a terse observation string. Subtle faults may be missed.
-        """
+        """Visually inspect a component area and report what a tech would see."""
         return ToolOutput(
             blocks=_text(self._session.visual_inspect(params.area))
         )
 
     @tool
     def replace_part(self, params: ReplacePartParams) -> ToolOutput:
-        """Install a known-good replacement part (costs parts + labor).
-
-        Returns JSON with {installed: bool}. Does NOT report whether the old
-        part was actually faulty.
-        """
+        """Install a known-good replacement part (costs parts + labor)."""
         return ToolOutput(
             blocks=_text(_dump(self._session.replace_part(params.component)))
         )
 
     @tool
-    def attempt_start(self) -> ToolOutput:
-        """Turn the key and attempt to start the engine.
-
-        Returns JSON with the crank result (e.g. no_click, slow_crank, starts).
-        """
+    def attempt_start(self, params: NoParams) -> ToolOutput:
+        """Turn the key and attempt to start the engine."""
         return ToolOutput(blocks=_text(_dump(self._session.attempt_start())))
 
     # --- Episode termination ---
@@ -278,10 +292,7 @@ class NoStartEnv(Environment):
 
     @tool
     def finish(self, params: FinishParams) -> ToolOutput:
-        """Submit your final diagnosis. BEGIN your answer with the faulty
-        component and its failure mode (e.g. 'fusible_link blown');
-        supporting reasoning may follow. This ends the episode.
-        """
+        """Submit your final diagnosis. BEGIN your answer with the faulty component and its failure mode (e.g. 'fusible_link blown'); supporting reasoning may follow."""
         if not self._session.world.public_snapshot().finished:
             self._session.finish(params.answer)
         return self._grade()
