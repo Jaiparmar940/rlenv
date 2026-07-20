@@ -71,7 +71,10 @@ reliability in [`results/scale_curve.md`](results/scale_curve.md).
 
 *root-ok = episodes earning full root-cause credit (correct component AND correct
 failure mode). pass^k = full root-cause credit in every episode. verified-fix =
-the root-cause part was replaced and a successful start followed it.*
+the root-cause part was replaced and a successful start followed it. Per-cell
+(model × scenario) results at n=5 epochs carry wide uncertainty; the per-cell
+numbers below describe the published run, and the tier-level patterns are the
+stable findings.*
 
 **The frontier has cleared the textbook tier — and stalls one tier up.** On the
 easy and medium scenarios, four flagship models earn full root-cause credit in 59
@@ -85,47 +88,50 @@ passes every episode.** The benchmark is not saturated at the top.
 
 **The two hard scenarios fail different models differently.** The intermittent
 ECU/CAN fault moves no voltage; the skill is refusing to let one clean scan or
-one good crank exonerate anything. claude-fable-5 is the only model that
-reliably names it (4/5), gpt-5.5 gets it 3/5, and claude-sonnet-5 — which
-otherwise matches fable — goes 0/5, twice condemning the ignition switch with
-full confidence. The compound scenario inverts the ranking: sonnet-5 names both
-faults in 4 of 5 episodes (89.3, the best cell on the board), while grok-4 finds
-the subtle ground strap all five times and *never once mentions the genuinely
-bad battery it also replaced* — reporting half your repair is a 15-point hole.
-Every frontier model still *fixes* the compound car (the physics forces both
-repairs before the engine will start); what separates them is whether the
-diagnosis they hand back matches the work they did.
+one good crank exonerate anything. In the published run claude-fable-5 named it
+most reliably (4 of 5 episodes), gpt-5.5 got it 3 of 5, and claude-sonnet-5 —
+which otherwise matches fable — 0 of 5, twice condemning the ignition switch
+with full confidence. The compound scenario inverted that ranking: sonnet-5
+named both faults in 4 of 5 episodes, the strongest compound showing on the
+board, while grok-4 found the subtle ground strap in every episode of the run
+without ever mentioning the genuinely bad battery it also replaced — reporting
+half your repair is a 15-point hole. Every frontier model still *fixes* the
+compound car (the physics forces both repairs before the engine will start);
+what separates them is whether the diagnosis they hand back matches the work
+they did.
 
 **The deployment tier fails one tier earlier.** `gemini-3.5-flash` and
 `claude-haiku-4-5` are the cost/latency class a product actually ships. Flash
-handles the single-fault ground scenarios (~89) and collapses on the hard tier
-(0/10 root-ok between both hard scenarios). Haiku does not even get that far: on
-the red-herring scenario it goes **0 for 5 with zero verified fixes, replacing
-14 innocent parts across those five episodes** — the alternator and battery
-every single time, the starter motor and relay twice — on a car whose fault is a
+handles the single-fault ground scenarios and collapses on the hard tier (0/10
+root-ok between both hard scenarios in the published run). Haiku does not even
+get that far: **it fails the red-herring scenario most of the time, anchoring on
+the decoy battery and replacing innocent parts** — in the published run it found
+the root cause in 0 of 5 red-herring episodes with zero verified fixes,
+swapping the alternator and battery in each of them — on a car whose fault is a
 $25 ground strap. It reaches for parts instead of the next measurement, at 1.8x
-to 3.5x expert technician time. A model that shotguns four parts onto a car and
+to 3.5x expert technician time. A model that shotguns parts onto a car and
 still leaves it broken is not a model you put in a bay.
 
 One eval-design note worth stating, because it is the kind of thing a grader
-gets wrong: **measured-first is 5/5 for haiku on every scenario.** It always
-takes a measurement before it starts replacing parts, so the guessing cap never
-fires. The behavior that actually costs it points is *measure once, then
-shotgun* — caught only because wrong parts debit the total rather than just
-their own bucket. A grader without that rule would have scored these episodes
-as disciplined.
+gets wrong: **haiku measures first in essentially every episode.** It takes a
+measurement before it starts replacing parts, so the guessing cap never fires.
+The behavior that actually costs it points is *measure once, then shotgun* —
+caught only because wrong parts debit the total rather than just their own
+bucket. A grader without that rule would have scored these episodes as
+disciplined.
 
 **The open 3B-8B tier can operate the tools and cannot do the reasoning.** This
 is the weight class that runs on-device, and the objection it preempts is "small
-models just fail at tool calling." They don't: `ministral-3b` runs clean
-16-message episodes on the dead battery — measure, replace, verify, finish — for
-full credit in 5 of 5 epochs, outscoring the 7B and 8B models above it. What no
+models just fail at tool calling." They don't: `ministral-3b` reliably runs
+clean 16-message episodes on the dead battery — measure, replace, verify,
+finish — for full credit, outscoring the 7B and 8B models above it. What no
 model in the tier can do is let a two-point measurement overturn a plausible
-prior: across all 45 open-tier episodes on the two ground-fault scenarios, there
-is exactly **one** full-credit diagnosis (ministral, one lucky epoch). The 8B
-model never earns root-cause credit anywhere in 25 episodes, and by its late
-epochs qwen-7b is emitting token soup as its final answer. The tier's failure is
-diagnostic reasoning, demonstrated with the tool mechanics held intact.
+prior: across all 45 open-tier episodes on the two ground-fault scenarios in
+the published run, there is exactly **one** full-credit diagnosis (ministral,
+one lucky epoch). The 8B model earned root-cause credit nowhere in its 25
+published episodes, and by its late epochs qwen-7b is emitting token soup as
+its final answer. The tier's failure is diagnostic reasoning, demonstrated with
+the tool mechanics held intact.
 
 **Means hide the reliability story.** pass^k — right in *every* episode — is the
 honest column, and at five epochs it is unforgiving: fable loses it to a single
