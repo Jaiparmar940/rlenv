@@ -22,13 +22,13 @@ Uncoached prompt — role, tools, and the job, with no strategy, no grader rules
 | Open 3B–8B | `qwen/qwen-2.5-7b` | 20.9 | 2/25 | ✗ | 6/25 |
 | Open 3B–8B | `meta-llama/llama-3.1-8b` | 7.2 | 0/25 | ✗ | 0/25 |
 
-> **root-ok** = full root-cause credit (correct component *and* failure mode). **pass^k** = full root-cause credit in every one of the model's episodes. **verified-fix** = root-cause part replaced and a successful start followed.
+> **root-ok** = full root-cause credit (correct component *and* failure mode). **pass^k** = full root-cause credit in every one of the model's episodes. **verified-fix** = root-cause part replaced and a successful start followed. Per-cell (model × scenario) scores at n=5 epochs carry wide uncertainty; tier-level patterns are the robust findings.
 
 **Frontier models have cleared textbook short-horizon automotive diagnosis** — 59 of 60 easy/medium episodes with full root-cause credit, red-herring scenario included — but the hard tier is not saturated. It pairs an intermittent CAN fault that no voltage reading reveals with a compound fault where the obvious bad battery hides a corroded ground strap; frontier models earn full root-cause credit on just 15 of 40 hard episodes, and **no model of the nine passes every episode.**
 
-The deployment tier — the cost/latency class that would actually run on a robot — fails a tier earlier: haiku-4-5 goes 0-for-5 on the red-herring scenario, swapping 14 innocent parts across those five episodes (alternator and battery every time) on a car whose fault is a $25 ground strap.
+The deployment tier — the cost/latency class that would actually run on a robot — fails a tier earlier: it loses the red-herring scenario most of the time, typically anchoring on the decoy battery and swapping innocent parts — alternator, battery, starter — on a car whose fault is a $25 ground strap.
 
-The open 3B–8B tier operates the tools competently but cannot localize: ministral-3b runs clean 16-message episodes on the trivial dead battery (5/5 full credit) and scores ~0 wherever a two-point measurement has to carry the diagnosis.
+The open 3B–8B tier operates the tools competently but cannot localize: ministral-3b reliably runs clean 16-message episodes to full credit on the trivial dead battery, and scores ~0 wherever a two-point measurement has to carry the diagnosis.
 
 Best-to-worst separation: **78.8 points.**
 
