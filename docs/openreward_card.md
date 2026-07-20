@@ -82,9 +82,12 @@ published Inspect run: **block 1 is the system prompt** (uncoached variant:
 role, tool reference, job definition, cost one-liner — no strategy, no grader
 rules), **block 2 is the user message** (customer complaint + task statement).
 ORS blocks carry no role; harnesses that support a system role should map
-block 1 there. The tool names, descriptions, and the `finish(answer)` schema
-also match the Inspect task exactly, so scores are comparable with the
-published table below.
+block 1 there. Both prompt blocks are verified byte-identical to the
+published run's wire-level API payloads (see `results/parity_diag/` in the
+repo). Tool names and the `finish(answer)` call match; tool description and
+schema serialization currently differ from Inspect's in documented ways
+(parity work tracked in `results/parity_diag/REPORT.md`), so treat scores as
+comparable with, not identical to, the published table below.
 
 ## Environment difficulty (published v0.1 results)
 
