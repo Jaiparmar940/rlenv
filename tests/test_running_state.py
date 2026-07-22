@@ -35,13 +35,19 @@ class TestRunningGate:
     def test_failed_start_does_not_enable_running(self) -> None:
         session = ToolSession("easy_dead_battery")
         assert session.attempt_start()["result"] == "no_click"
+        assert session.get_status().engine_state == "off"
         with pytest.raises(ValueError, match="not running"):
             session.measure_voltage(*BATT, "running")
+
+    def test_status_reports_running_engine(self) -> None:
+        session = _started_easy_session()
+        assert session.get_status().engine_state == "running"
 
     def test_other_key_state_shuts_engine_off(self) -> None:
         session = _started_easy_session()
         session.measure_voltage(*BATT, "running")  # fine while running
         session.measure_voltage(*BATT, "key_off")  # tech shuts it off
+        assert session.get_status().engine_state == "off"
         with pytest.raises(ValueError, match="not running"):
             session.measure_voltage(*BATT, "running")
 

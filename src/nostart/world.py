@@ -38,6 +38,7 @@ class EpisodeStatus(BaseModel):
     scenario_id: str
     complaint: str
     cumulative_cost: CumulativeCost
+    engine_state: str = "off"
     finished: bool = False
     diagnosis: str | None = None
     action_count: int = 0
@@ -180,6 +181,7 @@ class World:
             scenario_id=self._scenario.id,
             complaint=self._scenario.complaint,
             cumulative_cost=self._cumulative_cost.model_copy(deep=True),
+            engine_state="running" if self._engine_running else "off",
             finished=self._finished,
             diagnosis=self._diagnosis,
             action_count=self._action_count,
