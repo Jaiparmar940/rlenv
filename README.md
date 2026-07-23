@@ -1,10 +1,26 @@
+<div align="center">
+
 # no-start-env
+
+### Agentic Diagnostic Environment and Eval for Physical-Systems Fault Localization
+
+[![Status](https://img.shields.io/badge/status-v0.1-e8912d.svg)](#results)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Jaiparmar940/rlenv)
+[![Inspect](https://img.shields.io/badge/Inspect-inspect--ai-silver.svg)](https://inspect.aisi.org.uk)
+[![Scenarios](https://img.shields.io/badge/scenarios-5-silver.svg)](#scenarios-v01)
+[![Python](https://img.shields.io/badge/python-≥3.11-blue.svg)](https://docs.python.org/3/whatsnew/3.11.html)
+[![OpenReward](https://img.shields.io/badge/OpenReward-live-green.svg)](https://openreward.ai/jaivir/no-start-env)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+[Writeup](WRITEUP.md) · [Results](results/scale_curve.md) · [Second Nature](https://snlabs.dev) · [Report a Bug](https://github.com/Jaiparmar940/rlenv/issues)
+
+</div>
+
+---
 
 An agentic diagnostic environment and eval: a simulated vehicle with electrical no-start and charging faults, realistic shop tools, and a cheat-resistant grader. Built on [Inspect](https://inspect.aisi.org.uk) so a lab can run it directly.
 
 A car will not start. The agent gets the customer complaint and seven tools — `scan_dtcs`, `read_pid`, `measure_voltage`, `visual_inspect`, `replace_part`, `attempt_start`, `finish`. It has to localize the fault, replace the right part, and confirm the repair with a successful start. Nothing tells it whether the part it replaced was faulty.
-
-Full writeup and results discussion: [`WRITEUP.md`](WRITEUP.md).
 
 ## Results
 
