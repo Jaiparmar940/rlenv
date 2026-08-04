@@ -49,40 +49,47 @@ def make_agent(args):
     raise SystemExit(f"unknown agent {args.agent}")
 
 
-def run_one(variant: str, seed: int, args) -> float:
+def _caption(frame, text):
+    """Burn a caption strip into the frame; no-op if pillow is missing."""
+    try:
+        import numpy as np
+        from PIL import Image, ImageDraw
+    except ImportError:
+        return frame
+    img = Image.fromarray(frame)
+    draw = ImageDraw.Draw(img)
+    w, h = img.size
+    draw.rectangle([0, h - 28, w, h], fill=(0, 0, 0))
+    draw.text((8, h - 22), text[:90], fill=(255, 255, 255))
+    return np.asarray(img)
+
+
+def run_one(variant: str, seed: int, args, frames=None) -> float:
     backend = make_backend(args.backend)
     scenario = make_scenario(variant, seed)
     env = KitchenEnv(backend, scenario)
     agent = make_agent(args)
 
-    frames = []
-
-    def snap():
-        if args.gif:
+    def snap(label):
+        if args.gif and frames is not None:
             f = backend.render()
             if f is not None:
-                frames.append(f)
+                frames.append(_caption(f, f"[{variant}] {label}"))
 
     print(f"\n=== variant={variant} seed={seed} backend={backend.name} agent={args.agent} ===")
     obs = env.observation()
-    snap()
+    snap("initial state")
     for _ in range(MAX_ACTIONS):
         action = agent(obs)
         obs, over = env.step(action)
         ev = env.ep.events[-1]
         print(f"  [{ev.t:2d}] {ev.raw:45s} -> {ev.detail}")
-        snap()
+        snap(f"{ev.raw} -> {ev.detail}")
         if over:
             break
 
     g = grade(env.ep, backend)
     print(g.report())
-
-    if args.gif and frames:
-        import imageio.v3 as iio
-
-        iio.imwrite(args.gif, frames, duration=1200, loop=0)
-        print(f"  wrote {args.gif} ({len(frames)} frames)")
     return g.total
 
 
@@ -103,9 +110,15 @@ def main():
     else:
         variants = [args.variant]
 
-    totals = [run_one(v, args.seed, args) for v in variants]
+    frames: list = []
+    totals = [run_one(v, args.seed, args, frames) for v in variants]
     if len(totals) > 1:
         print(f"\nmean total over {len(totals)} variants: {sum(totals)/len(totals):.1f}")
+    if args.gif and frames:
+        import imageio.v3 as iio
+
+        iio.imwrite(args.gif, frames, duration=2000, loop=0)
+        print(f"wrote {args.gif} ({len(frames)} frames, ~{2*len(frames)}s)")
     return 0
 
 

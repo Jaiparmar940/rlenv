@@ -102,9 +102,12 @@ def _make_env_class():
 class RoboCasaBackend:
     name = "robocasa"
 
-    def __init__(self, layout_id: int = 0, style_id: int = 0):
+    def __init__(self, layout_id: int = 1, style_id: int = 8,
+                 cam_azimuth: float = 40.0, cam_distance: float = 3.6):
         self.layout_id = layout_id
         self.style_id = style_id
+        self._cam_azimuth = cam_azimuth
+        self._cam_distance = cam_distance
         self.env = None
 
     # ------------------------------------------------------------ lifecycle
@@ -114,6 +117,7 @@ class RoboCasaBackend:
             object_regions=object_regions,
             robots="PandaOmron",
             seed=seed,
+            obj_registries=("objaverse", "lightwheel", "aigen"),
             layout_ids=[self.layout_id],
             style_ids=[self.style_id],
             has_renderer=False,
@@ -136,19 +140,18 @@ class RoboCasaBackend:
 
     def set_door(self, fixture: str, open_: bool) -> None:
         fix = self._fixture(fixture)
-        v = 1.0 if open_ else 0.0
-        fix.set_door_state(min=v, max=v, env=self.env)
+        if open_:
+            fix.open_door(env=self.env, min=1.0, max=1.0)
+        else:
+            fix.close_door(env=self.env)
         self.env.sim.forward()
 
     def door_open(self, fixture: str) -> bool:
         fix = self._fixture(fixture)
-        joints = getattr(fix, "door_joint_names", None)
         try:
-            return bool(fix.is_open(env=self.env)) if joints is None else bool(
-                fix.is_open(env=self.env, joint_names=joints)
-            )
-        except TypeError:
             return bool(fix.is_open(env=self.env))
+        except TypeError:
+            return bool(fix.is_open(env=self.env, joint_names=fix.door_joint_names))
 
     # -------------------------------------------------------------- objects
     def _obj_pos(self, obj: str) -> np.ndarray:
@@ -220,6 +223,19 @@ class RoboCasaBackend:
 
     # --------------------------------------------------------------- render
     def render(self):
-        return self.env.sim.render(
-            width=640, height=480, camera_name="robot0_agentview_center"
-        )[::-1]
+        """Free-camera render framing the fridge/microwave/counter work area,
+        through robosuite's own offscreen context (a fresh mujoco.Renderer
+        context loses robosuite's uploaded textures; the robot-mounted cameras
+        face wherever the base spawned)."""
+        sim = self.env.sim
+        if getattr(sim, "_render_context_offscreen", None) is None:
+            sim.render(width=64, height=64, camera_name="robot0_agentview_center")
+        cam = sim._render_context_offscreen.cam
+        mid = (np.array(self.env.fridge.pos) + np.array(self.env.microwave.pos)) / 2
+        cam.lookat[:] = [mid[0], mid[1], 1.1]
+        cam.distance = self._cam_distance
+        cam.azimuth = self._cam_azimuth
+        cam.elevation = -18
+        cam.fixedcamid = -1
+        cam.type = 0  # mjCAMERA_FREE
+        return sim.render(width=640, height=480)[::-1].copy()
