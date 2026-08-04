@@ -128,10 +128,11 @@ class RoboCasaBackend:
         self.env.reset()
         self._held: str | None = None
         self._trash: set[str] = set()
-        # a spot guaranteed empty: 1.5 m above the fridge (nothing falls —
-        # we never step physics, only mj_forward)
-        f = self.env.fridge
-        self._held_pos = np.array(f.pos) + np.array([0.0, 0.0, f.height + 1.5])
+        # "held" pose: floats at chest height between fridge and microwave,
+        # visible in the demo camera (nothing falls — we never step physics,
+        # only mj_forward)
+        mid = (np.array(self.env.fridge.pos) + np.array(self.env.microwave.pos)) / 2
+        self._held_pos = np.array([mid[0], mid[1] - 0.55, 1.45])
         self._shelf_slot = 0
 
     # ---------------------------------------------------------------- doors
@@ -194,9 +195,9 @@ class RoboCasaBackend:
             self._held = obj
             self._teleport(obj, self._held_pos)
         elif region == "trash":
-            # pseudo-bin: a fixed pose well outside the scene footprint
+            # pseudo-bin: a fixed pose below the floor, outside every fixture
             self._trash.add(obj)
-            self._teleport(obj, self._held_pos + np.array([0.0, 0.0, 1.0]))
+            self._teleport(obj, np.array([0.0, 0.0, -3.0]))
         else:
             self._teleport(obj, self._region_pos(region))
 

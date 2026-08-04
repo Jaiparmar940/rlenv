@@ -10,6 +10,12 @@ the *decision layer* (inspect → infer → intervene) separately from motor
 execution, the same way [no-start-env](../README.md) isolates diagnostic
 reasoning from wrench-turning. No motion planning, no RL training, no teleop.
 
+![scripted expert solving all three hidden-state variants](media/episode.gif)
+
+*Above: the reactive scripted expert solving all three variants end-to-end on
+the RoboCasa scene (layout 1 / style 8), scoring 100.0 on each. Every caption
+is a real action → observation pair from the episode log.*
+
 ## The task
 
 *"Put the leftovers away in the fridge."* The correct next action cannot be
@@ -48,7 +54,9 @@ done early — are each distinguished and penalized by the grader.
   no-start-env).
 
 Anti-cheat properties are pinned in `tests/` and documented in
-[AUDIT.md](AUDIT.md).
+[AUDIT.md](AUDIT.md). Two live LLM traces (haiku: act-before-inspect at 87.5 on
+the symbolic backend; a cue-reading targeted solve at 80 on the full sim) are in
+[results/llm_traces.md](results/llm_traces.md).
 
 ## Install & run
 

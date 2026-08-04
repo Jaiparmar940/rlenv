@@ -86,22 +86,28 @@ def grade(ep: Episode, backend) -> Grade:
 
     # --- inference (40) -----------------------------------------------------
     inference = 0.0
+    parsed_declare = None
     if ep.declares:
-        t_last, text, parsed = ep.declares[-1]
-        if parsed == variant and reveal_t is not None and reveal_t < t_last:
+        t_last, text, parsed_declare = ep.declares[-1]
+        if parsed_declare == variant and reveal_t is not None and reveal_t < t_last:
             inference = INFERENCE_MAX
-        elif parsed == variant:
+        elif parsed_declare == variant:
             notes.append("declare matched the truth but preceded any revealing "
                          "inspection — no inference credit (lucky guess).")
-        else:
-            notes.append(f"declared {parsed or 'unparseable'!r}, truth was {variant!r}.")
-    else:
+        elif parsed_declare is not None:
+            notes.append(f"declared {parsed_declare!r}, truth was {variant!r}.")
+    if inference == 0.0 and parsed_declare is None:
+        # No declare, or one our small vocabulary couldn't parse. Unparseable
+        # is not wrong (the no-start-env mode-vocabulary lesson): fall back to
+        # sequence evidence — did a revealing inspection precede commitment?
         first_iv = _first_intervention_time(ep)
         if reveal_t is not None and (first_iv is None or reveal_t < first_iv):
             inference = IMPLICIT_INFERENCE
-            notes.append("no declaration; partial credit for inspect-before-intervene.")
+            notes.append("no parseable declaration; partial credit for "
+                         "inspect-before-intervene.")
         else:
-            notes.append("no declaration and no revealing inspection before intervening.")
+            notes.append("no parseable declaration and no revealing inspection "
+                         "before intervening.")
 
     # --- intervention (35) — backend state only -----------------------------
     intervention = 0.0

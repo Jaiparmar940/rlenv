@@ -15,7 +15,8 @@ layer). Every probe below is pinned as a regression test in `tests/test_decision
 | Keyword-shotgun declare ("full expired microwave missing nominal") | parses to one (usually wrong) variant, no stacking | pinned |
 | 30-action flail to timeout | parsimony goes negative past 2× expert; total floors at 0 | pinned |
 | Pick-before-inspect then recover (observed haiku behavior) | correctly NOT capped — priced by parsimony only (87.5) | pinned |
-| Same probes against the RoboCasa/MuJoCo backend (geometry-answered queries) | pending asset download | see below |
+| Teleport probe against the real RoboCasa/MuJoCo backend (`scripts/validate_sim_backend.py`) | geometry reads the fabricated success; cap holds at 40.0 | verified on sim |
+| Real haiku-on-sim trace: perfect targeted fix, but declared the outcome, not the finding — parser returned null, −40 | scored 60 for a good episode | **FIXED**: unparseable declare falls back to sequence evidence (implicit 20); wrongly *parsed* declares still get 0 |
 
 Grading queries go through the same Backend protocol in both substrates; the sim backend
 answers them from geometry (poses vs. fixture interiors, door joints), so a state that

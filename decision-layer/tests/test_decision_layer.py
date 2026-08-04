@@ -201,6 +201,28 @@ def test_pick_before_inspect_is_not_capped_just_inefficient():
     assert g.parsimony < 25.0
 
 
+def test_unparseable_declare_falls_back_to_sequence_evidence():
+    """Pinned from a real haiku-on-sim transcript (2026-08-04): targeted
+    microwave-first inspection, perfect fix, but declared the outcome
+    ('leftovers container stored in fridge') instead of the finding.
+    Unparseable is not wrong: sequence evidence earns the implicit 20."""
+    _, _, g = run_actions("container_missing", [
+        "open microwave", "pick leftovers container", "open fridge",
+        "place leftovers container fridge", "close fridge", "close microwave",
+        "declare leftovers container stored in fridge", "done",
+    ])
+    assert g.inference == 20.0
+    assert g.total == 80.0
+
+
+def test_wrongly_parsed_declare_still_scores_zero_inference():
+    _, _, g = run_actions("nominal", [
+        "open fridge", "declare the fridge is full",  # parses, and is wrong
+        "pick leftovers", "place leftovers fridge", "close fridge", "done",
+    ])
+    assert g.inference == 0.0
+
+
 def test_no_declare_but_inspect_first_gets_partial_inference():
     _, _, g = run_actions("nominal", [
         "open fridge", "pick leftovers", "place leftovers fridge",
