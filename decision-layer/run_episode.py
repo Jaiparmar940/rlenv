@@ -49,8 +49,21 @@ def make_agent(args):
     raise SystemExit(f"unknown agent {args.agent}")
 
 
+ORACLE_NOTE = "oracle execution: actions set sim state directly - the arm never moves (by design)"
+
+
+def _font(size):
+    try:
+        from PIL import ImageFont
+
+        return ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", size)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _caption(frame, text):
-    """Burn a caption strip into the frame; no-op if pillow is missing."""
+    """Burn a two-line caption strip: the action, and the standing oracle
+    disclaimer. No-op if pillow is missing."""
     try:
         import numpy as np
         from PIL import Image, ImageDraw
@@ -59,8 +72,38 @@ def _caption(frame, text):
     img = Image.fromarray(frame)
     draw = ImageDraw.Draw(img)
     w, h = img.size
-    draw.rectangle([0, h - 28, w, h], fill=(0, 0, 0))
-    draw.text((8, h - 22), text[:90], fill=(255, 255, 255))
+    draw.rectangle([0, h - 46, w, h], fill=(0, 0, 0))
+    draw.text((8, h - 42), text[:95], fill=(255, 255, 255), font=_font(14))
+    draw.text((8, h - 22), ORACLE_NOTE, fill=(160, 160, 160), font=_font(13))
+    return np.asarray(img)
+
+
+def _title_card(shape):
+    """Opening frame stating what the demo is (and is not) showing."""
+    try:
+        import numpy as np
+        from PIL import Image, ImageDraw
+    except ImportError:
+        return None
+    h, w = shape[:2]
+    img = Image.new("RGB", (w, h), (12, 12, 12))
+    draw = ImageDraw.Draw(img)
+    lines = [
+        ("decision-layer eval: put the leftovers away", 24, (255, 255, 255)),
+        ("", 16, None),
+        ("The agent under test is a reasoning model choosing", 17, (220, 220, 220)),
+        ("discrete actions. Hidden state forces inspect -> infer", 17, (220, 220, 220)),
+        ("-> intervene; a grader scores each separately.", 17, (220, 220, 220)),
+        ("", 16, None),
+        ("Execution is ORACLE by design: valid actions set", 17, (255, 210, 130)),
+        ("simulator state directly. The robot arm is scenery,", 17, (255, 210, 130)),
+        ("not the system being evaluated - it never actuates.", 17, (255, 210, 130)),
+    ]
+    y = h // 2 - 110
+    for text, size, color in lines:
+        if color:
+            draw.text((40, y), text, fill=color, font=_font(size))
+        y += size + 8
     return np.asarray(img)
 
 
@@ -117,6 +160,9 @@ def main():
     if args.gif and frames:
         import imageio.v3 as iio
 
+        card = _title_card(frames[0].shape)
+        if card is not None:
+            frames = [card, card] + frames  # ~4s up front
         iio.imwrite(args.gif, frames, duration=2000, loop=0)
         print(f"wrote {args.gif} ({len(frames)} frames, ~{2*len(frames)}s)")
     return 0

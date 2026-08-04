@@ -14,7 +14,9 @@ reasoning from wrench-turning. No motion planning, no RL training, no teleop.
 
 *Above: the reactive scripted expert solving all three variants end-to-end on
 the RoboCasa scene (layout 1 / style 8), scoring 100.0 on each. Every caption
-is a real action → observation pair from the episode log.*
+is a real action → observation pair from the episode log. The robot arm is
+scenery and never actuates — doors and objects change state directly because
+execution is oracle; the decision sequence is the system under test.*
 
 ## The task
 
