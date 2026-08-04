@@ -1,8 +1,10 @@
 # no-start-env
 
-An agentic diagnostic environment and eval: a simulated vehicle with electrical no-start and charging faults, realistic shop tools, and a cheat-resistant grader. Built on [Inspect](https://inspect.aisi.org.uk) so a lab can run it directly.
+An agentic RL environment and physical-reasoning benchmark for LLM agents: a simulated vehicle with electrical no-start and charging faults, realistic shop tools, and a cheat-resistant grader. Built on [Inspect](https://inspect.aisi.org.uk) so a lab can run it directly.
 
 A car will not start. The agent gets the customer complaint and seven tools — `scan_dtcs`, `read_pid`, `measure_voltage`, `visual_inspect`, `replace_part`, `attempt_start`, `finish`. It has to localize the fault, replace the right part, and confirm the repair with a successful start. Nothing tells it whether the part it replaced was faulty.
+
+no-start-env is the first environment from [Second Nature Labs](https://snlabs.dev), which builds physics-grounded RL environments and evals for AI that touches the real world.
 
 Full writeup and results discussion: [`WRITEUP.md`](WRITEUP.md).
 
