@@ -158,6 +158,49 @@ def test_timeout_without_done_is_noted():
     assert g.total == 0.0  # flail overrun debits below zero, floored
 
 
+def test_teleported_accidental_success_is_capped():
+    """Sim teleported into a perfect end state with zero agent actions —
+    the grader must not false-fire."""
+    backend = SymbolicBackend()
+    env = KitchenEnv(backend, make_scenario("nominal", 0))
+    backend.move_object("leftovers", "fridge_shelf")  # bypasses the env
+    g = grade(env.ep, backend)
+    assert g.inference == 0.0
+    assert g.total <= 40.0
+
+
+def test_teleported_success_plus_early_done_is_capped():
+    backend = SymbolicBackend()
+    env = KitchenEnv(backend, make_scenario("fridge_full", 0))
+    env.step("done")
+    backend.move_object("expired_milk", "trash")
+    backend.move_object("leftovers", "fridge_shelf")
+    g = grade(env.ep, backend)
+    assert g.total <= 40.0
+
+
+def test_open_everything_solver_is_not_capped_just_inefficient():
+    _, _, g = run_actions("container_missing", [
+        "open cabinet", "open fridge", "open microwave", "pick leftovers",
+        "place leftovers fridge", "close fridge", "close microwave",
+        "close cabinet", "done",
+    ])
+    # microwave (the reveal) opened before placing -> not capped, but spam paid for
+    assert g.cap == 100.0 and g.parsimony < 25.0
+
+
+def test_pick_before_inspect_is_not_capped_just_inefficient():
+    # haiku's observed failure shape: grab first, inspect second, recover
+    _, _, g = run_actions("fridge_full", [
+        "pick leftovers", "open fridge", "place leftovers counter",
+        "pick milk", "discard milk", "pick leftovers",
+        "place leftovers fridge", "close fridge",
+        "declare fridge was full, milk expired", "done",
+    ])
+    assert g.cap == 100.0
+    assert g.parsimony < 25.0
+
+
 def test_no_declare_but_inspect_first_gets_partial_inference():
     _, _, g = run_actions("nominal", [
         "open fridge", "pick leftovers", "place leftovers fridge",

@@ -31,6 +31,11 @@ INTERVENTION_TIDY = 5
 # "work" (makes room) but destroys value. Debits the intervention bucket per
 # item and can push it negative; the total is floored at 0.
 FRESH_DISCARD_PENALTY = 15
+# Guessing cap, ported from no-start-env: an episode whose end state looks
+# right but where the agent never observed the hidden state before
+# intervening (or never acted at all — e.g. a fabricated/teleported success)
+# cannot score above this, no matter what the predicates say.
+GUESSING_CAP = 40
 
 
 @dataclass
@@ -39,10 +44,12 @@ class Grade:
     parsimony: float
     intervention: float
     notes: list[str]
+    cap: float = 100.0
 
     @property
     def total(self) -> float:
-        return max(0.0, round(self.inference + self.parsimony + self.intervention, 1))
+        raw = self.inference + self.parsimony + self.intervention
+        return max(0.0, round(min(raw, self.cap), 1))
 
     def report(self) -> str:
         lines = [
@@ -63,8 +70,11 @@ def _reveal_time(ep: Episode) -> int | None:
 
 
 def _first_intervention_time(ep: Episode) -> int | None:
+    """First COMMITTAL act. Picking something up is reversible and carries no
+    information; placing or discarding commits to a belief (the no-start-env
+    cap keys on probes-before-first-replacement for the same reason)."""
     for e in ep.events:
-        if e.kind in ("pick", "place", "discard") and e.ok:
+        if e.kind in ("place", "discard") and e.ok:
             return e.t
     return None
 
@@ -138,4 +148,13 @@ def grade(ep: Episode, backend) -> Grade:
     if parsimony < 0:
         notes.append(f"action-count overrun ({n} vs expert {expert}) debits the total.")
 
-    return Grade(inference, parsimony, intervention, notes)
+    # --- guessing cap -------------------------------------------------------
+    first_iv = _first_intervention_time(ep)
+    uninformed = reveal_t is None or (first_iv is not None and reveal_t > first_iv)
+    cap = 100.0
+    if uninformed:
+        cap = float(GUESSING_CAP)
+        notes.append(f"no revealing inspection before intervening (or at all): "
+                     f"total capped at {GUESSING_CAP}.")
+
+    return Grade(inference, parsimony, intervention, notes, cap)
