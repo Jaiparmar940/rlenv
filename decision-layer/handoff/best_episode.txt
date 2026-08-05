@@ -1,0 +1,118 @@
+BEST EPISODE — scripted expert, variant=fridge_full, seed=0, backend=robocasa (layout 1 / style 8)
+The reactive expert reads only observation text; ground truth is never touched.
+==============================================================================
+
+INITIAL OBSERVATION
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+
+ACTION [1]: open fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, milk carton (label: expired 3 weeks ago), juice bottle (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The fridge is now open.
+
+ACTION [2]: declare fridge shelf is full, milk is expired
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, milk carton (label: expired 3 weeks ago), juice bottle (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: Noted: 'fridge shelf is full, milk is expired'
+
+ACTION [3]: pick milk
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, juice bottle (2/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: milk carton (label: expired 3 weeks ago).
+Result of last action: You are holding the milk carton (label: expired 3 weeks ago).
+
+ACTION [4]: discard milk
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, juice bottle (2/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The milk carton (label: expired 3 weeks ago) is in the trash.
+
+ACTION [5]: pick leftovers
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, juice bottle (2/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: leftovers container.
+Result of last action: You are holding the leftovers container.
+
+ACTION [6]: place leftovers fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, juice bottle, leftovers container (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The leftovers container is now in/on the fridge.
+
+ACTION [7]: close fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The fridge is now closed.
+
+ACTION [8]: done
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: You step back from the counter.
+
+GRADER
+----------------------------------------
+  inference       40.0 / 40
+  parsimony       25.0 / 25
+  intervention    35.0 / 35
+  TOTAL          100.0 / 100
+  wall-clock: 0.01s (8 actions)

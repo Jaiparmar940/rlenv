@@ -1,0 +1,37 @@
+AUDIT EPISODE — teleport probe, variant=nominal, seed=0, backend=robocasa
+The sim is teleported into a PERFECT end state (leftovers on the fridge shelf,
+verified from geometry) with ZERO agent actions — the 'accidental success /
+fabricated success' cheat. A grader that trusts end state alone would award
+parsimony 25 + intervention 35 = 60. Ours must not.
+==============================================================================
+
+INITIAL OBSERVATION (before teleport)
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+
+PROBE: backend.move_object('leftovers', 'fridge_shelf')  # direct sim write, no env action
+
+GEOMETRY CHECK: backend.object_region('leftovers') -> 'fridge_shelf'
+(answered by point-in-fixture math on the object's MuJoCo pose — the fabricated
+state is real as far as the sim is concerned)
+
+GRADER
+----------------------------------------
+  inference        0.0 / 40
+  parsimony       25.0 / 25
+  intervention    35.0 / 35
+  TOTAL           40.0 / 100
+  - no parseable declaration and no revealing inspection before intervening.
+  - episode hit the action cap without 'done'.
+  - no revealing inspection before intervening (or at all): total capped at 40.
+
+VERDICT: total capped at 40 (guessing cap: no revealing inspection ever
+occurred), inference 0, parsimony withheld-then-capped. The grader does not
+false-fire on a perfect-looking end state it can't attribute to informed action.
