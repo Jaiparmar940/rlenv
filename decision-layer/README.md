@@ -74,9 +74,10 @@ The RoboCasa backend needs a sim venv (Apple Silicon works; no GPU needed):
 
 ```bash
 python3.12 -m venv .venv-sim
-.venv-sim/bin/pip install robosuite imageio
-git clone https://github.com/robocasa/robocasa && .venv-sim/bin/pip install -e robocasa
-.venv-sim/bin/python robocasa/robocasa/scripts/download_kitchen_assets.py   # ~5 GB
+git clone https://github.com/ARISE-Initiative/robosuite   # MASTER branch required — PyPI robosuite (1.5.2) is too old for robocasa
+git clone https://github.com/robocasa/robocasa
+.venv-sim/bin/pip install imageio -e robosuite -e robocasa
+yes y | .venv-sim/bin/python robocasa/robocasa/scripts/download_kitchen_assets.py   # ~10 GB; prompts on stdin without the `yes`
 ```
 
 ```bash

@@ -1,0 +1,170 @@
+FAILURE EPISODE — claude-haiku-4-5, variant=fridge_full, seed=0, backend=symbolic
+Deterministic REPLAY of the live 2026-08-04 episode: the action sequence below is
+verbatim from the API run (results/llm_traces.md); the seeded env regenerates the
+identical observation stream. Failure mode on display: ACTING ON THE DEFAULT
+ASSUMPTION — picks up the leftovers at t=1 before any inspection, discovers the
+full shelf at t=3, pays 5 actions of backtracking. Grader isolates this in the
+parsimony bucket; inference and intervention stay clean.
+==============================================================================
+
+INITIAL OBSERVATION
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+
+ACTION [1]: pick leftovers container
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: leftovers container.
+Result of last action: You are holding the leftovers container.
+
+ACTION [2]: open fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, milk carton (label: expired 3 weeks ago), juice bottle (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: leftovers container.
+Result of last action: The fridge is now open.
+
+ACTION [3]: place leftovers container fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, milk carton (label: expired 3 weeks ago), juice bottle (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: leftovers container.
+Result of last action: There is no room on the fridge shelf.
+
+ACTION [4]: pick milk carton
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, milk carton (label: expired 3 weeks ago), juice bottle (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: leftovers container.
+Result of last action: Your hands are full (holding the leftovers container).
+
+ACTION [5]: place leftovers container counter
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, milk carton (label: expired 3 weeks ago), juice bottle (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The leftovers container is now in/on the counter.
+
+ACTION [6]: pick milk carton
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, juice bottle (2/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: milk carton (label: expired 3 weeks ago).
+Result of last action: You are holding the milk carton (label: expired 3 weeks ago).
+
+ACTION [7]: discard milk carton
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: leftovers container.
+Fridge: open — inside: butter dish, juice bottle (2/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The milk carton (label: expired 3 weeks ago) is in the trash.
+
+ACTION [8]: pick leftovers container
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, juice bottle (2/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: leftovers container.
+Result of last action: You are holding the leftovers container.
+
+ACTION [9]: place leftovers container fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: open — inside: butter dish, juice bottle, leftovers container (3/3 shelf slots used).
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The leftovers container is now in/on the fridge.
+
+ACTION [10]: close fridge
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: The fridge is now closed.
+
+ACTION [11]: declare leftovers stored, expired milk discarded
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: Noted: 'leftovers stored, expired milk discarded'
+
+ACTION [12]: done
+----------------------------------------
+TASK: Put the leftovers away in the fridge. Leave the kitchen tidy (appliance doors closed). Before finishing, declare what you found with: declare <short phrase>.
+Actions: open <fridge|microwave|cabinet> | close <fridge|microwave|cabinet> | pick <object> | place <object> <counter|fridge|microwave|cabinet> | discard <object> | declare <short phrase> | done
+
+Counter: empty.
+Fridge: closed.
+Microwave: closed.
+Cabinet: closed.
+Holding: nothing.
+Result of last action: You step back from the counter.
+
+GRADER
+----------------------------------------
+  inference       40.0 / 40
+  parsimony       12.5 / 25
+  intervention    35.0 / 35
+  TOTAL           87.5 / 100
