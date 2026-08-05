@@ -7,7 +7,7 @@ scene. Execution of each primitive is **oracle by design** — a valid action is
 realized by setting simulator state directly through the robosuite/RoboCasa
 Python API. This is the product thesis, not a shortcut: we isolate and grade
 the *decision layer* (inspect → infer → intervene) separately from motor
-execution, the same way [no-start-env](../README.md) isolates diagnostic
+execution, the same way [no-start-env](../no-start-env.md) isolates diagnostic
 reasoning from wrench-turning. No motion planning, no RL training, no teleop.
 
 ![scripted expert solving all three hidden-state variants](media/episode.gif)
