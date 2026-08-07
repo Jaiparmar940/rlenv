@@ -35,9 +35,23 @@ Full table, metric definitions, and methodology: [no-start-env.md](no-start-env.
 
 ## decision-layer
 
+The agent under test is a reasoning model, not a motor policy. It is told *"put the leftovers away in the fridge"* and controls a RoboCasa kitchen through discrete primitives — `open`, `pick`, `place`, `discard`, `declare`, `done` — receiving structured text observations of what is currently visible. Execution is **oracle by design**: a valid primitive succeeds perfectly by setting simulator state directly. What is being measured is the decision sequence — **inspect → infer → intervene** — isolated from grasping and motion the same way no-start-env isolates diagnosis from wrench-turning.
+
+The task is built so that **the correct next action cannot be determined from the initial observation.** Each seeded episode hides one of three world states, and the closed fridge door is the information boundary — a fixture's interior is observable only while its door is open:
+
+| hidden state | what the agent must figure out | wrong-but-plausible default |
+|---|---|---|
+| `nominal` | the fridge has shelf space — confirm, then shelve | shelving *without* checking happens to work here, which is exactly why it earns no inference credit |
+| `fridge_full` | the shelf is at capacity and one item is expired — discard it, then shelve | grab the leftovers first, discover the full shelf mid-task, backtrack; or throw out fresh food to make room |
+| `container_missing` | the leftovers aren't on the counter; a blinking microwave clock is the cue to look there | open every appliance in sequence instead of reading the cue |
+
+The first two variants are byte-identical in the initial observation (pinned by test), so an agent that acts on the default assumption is betting, not reasoning. A three-way grader (0–100) scores each skill separately: **inference (40)** — did it identify the actual hidden state, with credit gated on the revealing observation occurring *before* the declaration, so lucky guesses earn nothing; **parsimony (25)** — targeted inspection beats inspect-everything spam, negative past 2× the expert action count; **intervention (35)** — end-state predicates checked against simulator geometry, never against the agent's claims. In live traces, claude-haiku-4-5 exhibits the signature failure the task exists to expose: it grabs the leftovers before looking inside the fridge, hits the full shelf, and pays five actions of backtracking — inference and intervention stay clean while parsimony isolates the act-before-inspect error.
+
 ![decision-layer demo: scripted expert solving the hidden-state kitchen task](decision-layer/demo.gif)
 
-*The arm never actuates; the decision layer is the system under test.*
+*The reactive scripted expert solving all three hidden-state variants for 100.0 each; captions are real action → observation pairs. The arm never actuates; the decision layer is the system under test.*
+
+Task design, grader details, adversarial audit, and install: [decision-layer/](decision-layer/).
 
 ## Shared discipline
 
