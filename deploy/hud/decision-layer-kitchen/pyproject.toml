@@ -1,0 +1,17 @@
+[project]
+name = "decision-layer-kitchen-hud"
+version = "0.1.0"
+description = "HUD managed-environment packaging for the decision-layer kitchen task (Second Nature Labs)"
+requires-python = ">=3.11,<3.13"
+# The symbolic backend is pure standard library. The kitchen_task package is
+# mirrored into vendor/ by deploy/hud/stage.py and put on sys.path by
+# adapter_core, so the repo keeps exactly one copy of the domain code.
+# robosuite / robocasa / mujoco are deliberately NOT dependencies: the sim is
+# the validation substrate, not the production one.
+dependencies = ["hud>=0.6.12,<0.7"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.uv]
+package = false

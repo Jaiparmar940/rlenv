@@ -1,0 +1,38 @@
+[
+  {
+    "env": "decision-layer-kitchen",
+    "id": "put_away",
+    "args": {
+      "task_id": "dlk-01",
+      "seed": 0
+    },
+    "slug": "dlk-01",
+    "columns": {
+      "seed": 0
+    }
+  },
+  {
+    "env": "decision-layer-kitchen",
+    "id": "put_away",
+    "args": {
+      "task_id": "dlk-02",
+      "seed": 0
+    },
+    "slug": "dlk-02",
+    "columns": {
+      "seed": 0
+    }
+  },
+  {
+    "env": "decision-layer-kitchen",
+    "id": "put_away",
+    "args": {
+      "task_id": "dlk-03",
+      "seed": 0
+    },
+    "slug": "dlk-03",
+    "columns": {
+      "seed": 0
+    }
+  }
+]

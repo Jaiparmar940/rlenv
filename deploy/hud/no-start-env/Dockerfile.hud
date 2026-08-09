@@ -1,0 +1,32 @@
+# no-start-env — HUD managed environment container.
+#
+# Build context is this directory only (that is what `hud deploy` tarballs), so
+# the nostart package must be staged into vendor/ first:
+#
+#     python deploy/hud/stage.py
+#     docker build -f Dockerfile.hud -t no-start-env-hud .
+#
+# The image serves the HUD control channel on 8765; the FastMCP tool server is
+# internal (127.0.0.1:8040) and reached through that channel.
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pyproject.toml uv.lock* ./
+RUN pip install uv && uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
+COPY . .
+
+# Fail the build rather than ship an image whose environment cannot import the
+# domain package or whose scenario set has drifted.
+RUN uv run python -c "\
+import adapter_core as a; \
+assert len(a.TASK_SCENARIOS) == 5, a.TASK_SCENARIOS; \
+s = a.NoStartSession('ns-01'); \
+assert 'Customer complaint:' in s.prompt(); \
+print('healthcheck: nostart importable, 5 tasks, prompt built')"
+
+# Serve the Environment's control channel (tcp JSON-RPC) on 8765.
+EXPOSE 8765
+CMD ["uv", "run", "hud", "serve", "env:env", "--host", "0.0.0.0", "--port", "8765"]

@@ -1,0 +1,14 @@
+# NOTE: vendor/ is deliberately NOT ignored — it carries the nostart package
+# into the image (staged by deploy/hud/stage.py). Do not add a .gitignore to
+# this directory either: `hud deploy` folds a directory-local .gitignore into
+# the build-context excludes, which would silently drop vendor/ from the
+# tarball. vendor/ is ignored from the repository root instead.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.DS_Store
+.env
+.venv/

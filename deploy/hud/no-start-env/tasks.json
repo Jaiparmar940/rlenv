@@ -1,0 +1,57 @@
+[
+  {
+    "env": "no-start-env",
+    "id": "diagnose",
+    "args": {
+      "task_id": "ns-01"
+    },
+    "slug": "ns-01",
+    "columns": {
+      "tier": "easy"
+    }
+  },
+  {
+    "env": "no-start-env",
+    "id": "diagnose",
+    "args": {
+      "task_id": "ns-02"
+    },
+    "slug": "ns-02",
+    "columns": {
+      "tier": "medium"
+    }
+  },
+  {
+    "env": "no-start-env",
+    "id": "diagnose",
+    "args": {
+      "task_id": "ns-03"
+    },
+    "slug": "ns-03",
+    "columns": {
+      "tier": "medium"
+    }
+  },
+  {
+    "env": "no-start-env",
+    "id": "diagnose",
+    "args": {
+      "task_id": "ns-04"
+    },
+    "slug": "ns-04",
+    "columns": {
+      "tier": "hard"
+    }
+  },
+  {
+    "env": "no-start-env",
+    "id": "diagnose",
+    "args": {
+      "task_id": "ns-05"
+    },
+    "slug": "ns-05",
+    "columns": {
+      "tier": "hard"
+    }
+  }
+]

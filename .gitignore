@@ -48,3 +48,11 @@ results-*/
 YC_APP_DRAFT.md
 CLOSEOUT_STATUS.md
 V0.2.md
+
+# Marketplace packaging: vendor/ mirrors the authoritative packages at build
+# time (deploy/hud/stage.py). One copy of the domain code lives in the repo.
+deploy/hud/*/vendor/
+
+# Sim venv for the RoboCasa validation backend (10s of GB of deps).
+.venv-sim/
+.venv-hud/
