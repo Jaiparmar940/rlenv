@@ -61,9 +61,11 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -e ".[dev,models]"     # [models] = provider SDKs; omit for mock-only
 
 python scripts/sanity_check.py     # physics invariants -> ALL CHECKS PASSED
-python -m pytest tests/ -q         # 105 passed
+python -m pytest tests/ -q         # 106 passed
 python scripts/run_evals.py --mock # offline pipeline check; scripted expert scores 100
 ```
+
+> `run_evals.py` (including `--mock`) rewrites the tracked [`results/results.md`](results/results.md); restore the published table afterwards with `git checkout -- results/results.md`.
 
 Real-model runs need provider keys:
 

@@ -87,6 +87,13 @@ python run_episode.py --agent scripted --backend robocasa --gif media/episode.gi
 Any LLM drops in via one interface: a callable `observation_str -> action_str`
 (see `kitchen_task/agents.py`).
 
+The test suite pins the grader, the expert action-count baselines, and every
+adversarial probe in [AUDIT.md](AUDIT.md):
+
+```bash
+python -m pytest tests/ -q   # 19 passed; stdlib + pytest, no sim required
+```
+
 ## Architecture
 
 ```
@@ -115,3 +122,7 @@ though execution is oracle.
   (`task.py`); extend only against real transcripts — the no-start-env rule.
 - Three variants, one scene layout; layout jitter is seeded but unused.
 - Scripted expert doubles as the parsimony baseline generator.
+
+## License
+
+MIT — see [`LICENSE`](../LICENSE) at the repository root.
