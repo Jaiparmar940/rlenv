@@ -1,4 +1,21 @@
+<div align="center">
+
 # rlenv
+
+### Verified Environments and Evals for Physical Reasoning
+
+[![Status](https://img.shields.io/badge/status-v0.1-e8912d.svg)](#headline-results--no-start-env)
+[![Environments](https://img.shields.io/badge/environments-2-blue.svg)](#environments)
+[![Inspect](https://img.shields.io/badge/Inspect-inspect--ai-silver.svg)](https://inspect.aisi.org.uk)
+[![RoboCasa](https://img.shields.io/badge/RoboCasa-MuJoCo-silver.svg)](https://robocasa.ai)
+[![OpenReward](https://img.shields.io/badge/OpenReward-live-green.svg)](https://openreward.ai/jaivir/no-start-env)
+[![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+[no-start-env](no-start-env.md) · [decision-layer](decision-layer/) · [Second Nature Labs](https://snlabs.dev) · [Report a Bug](https://github.com/Jaiparmar940/rlenv/issues)
+
+</div>
+
+---
 
 Verified environments and evals for physical reasoning, built by [Second Nature Labs](https://snlabs.dev).
 
